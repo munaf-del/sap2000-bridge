@@ -5,7 +5,7 @@ from bridge.services.session_manager import session_manager
 
 
 def fresh_client() -> TestClient:
-    session_manager.adapter.__init__()
+    session_manager.reset()
     return TestClient(app)
 
 
@@ -40,6 +40,27 @@ def test_connect() -> None:
     assert body["correlation_id"]
 
 
+def test_connect_then_status_tracks_single_session() -> None:
+    client = fresh_client()
+    connect_response = client.post(
+        "/sap2000/connect",
+        json={"attach_to_running": True},
+        headers={"X-Correlation-ID": "connect-001"},
+    )
+    status_response = client.get("/sap2000/status", headers={"X-Correlation-ID": "status-001"})
+    body = status_response.json()
+
+    assert connect_response.status_code == 200
+    assert status_response.status_code == 200
+    assert body["connected"] is True
+    assert body["launched_by_bridge"] is False
+    assert body["model_open"] is False
+    assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
+    assert body["correlation_id"] == "status-001"
+    assert session_manager.last_correlation_id == "status-001"
+
+
 def test_launch() -> None:
     client = fresh_client()
     response = client.post(
@@ -53,6 +74,25 @@ def test_launch() -> None:
     assert body["launched_by_bridge"] is True
     assert body["version_number"] == "0.1.0-fake"
     assert body["correlation_id"]
+
+
+def test_launch_then_status_tracks_single_session() -> None:
+    client = fresh_client()
+    launch_response = client.post(
+        "/sap2000/launch",
+        json={"exe_path": None, "visible": True, "startup_delay_s": 3.0},
+        headers={"X-Correlation-ID": "launch-001"},
+    )
+    status_response = client.get("/sap2000/status", headers={"X-Correlation-ID": "status-002"})
+    body = status_response.json()
+
+    assert launch_response.status_code == 200
+    assert status_response.status_code == 200
+    assert body["connected"] is True
+    assert body["launched_by_bridge"] is True
+    assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
+    assert body["correlation_id"] == "status-002"
 
 
 def test_open_model() -> None:
@@ -75,6 +115,26 @@ def test_open_model() -> None:
     assert body["correlation_id"]
 
 
+def test_connect_then_open_model_then_status() -> None:
+    client = fresh_client()
+    client.post("/sap2000/connect", json={"attach_to_running": True})
+    open_response = client.post(
+        "/sap2000/open-model",
+        json={"path": "C:/models/demo.sdb", "copy_to_workspace": False},
+        headers={"X-Correlation-ID": "open-001"},
+    )
+    status_response = client.get("/sap2000/status")
+    open_body = open_response.json()
+    status_body = status_response.json()
+
+    assert open_response.status_code == 200
+    assert open_body["model_open"] is True
+    assert open_body["correlation_id"] == "open-001"
+    assert status_body["model_open"] is True
+    assert status_body["model_path"] == "C:/models/demo.sdb"
+    assert status_body["model_name"] == "demo.sdb"
+
+
 def test_not_connected_error_shape() -> None:
     client = fresh_client()
     response = client.post(
@@ -90,6 +150,37 @@ def test_not_connected_error_shape() -> None:
     assert body["error"]["sap_ret"] is None
     assert body["error"]["sap_context"] is None
     assert body["error"]["correlation_id"]
+
+
+def test_repeated_connect_does_not_create_conflicting_sessions() -> None:
+    client = fresh_client()
+    first = client.post("/sap2000/connect", json={"attach_to_running": True})
+    second = client.post("/sap2000/connect", json={"attach_to_running": True})
+    status = client.get("/sap2000/status")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["connected"] is True
+    assert second.json()["launched_by_bridge"] is False
+    assert status.json()["connected"] is True
+    assert status.json()["launched_by_bridge"] is False
+    assert status.json()["model_open"] is False
+
+
+def test_repeated_launch_does_not_create_conflicting_sessions() -> None:
+    client = fresh_client()
+    payload = {"exe_path": None, "visible": True, "startup_delay_s": 3.0}
+    first = client.post("/sap2000/launch", json=payload)
+    second = client.post("/sap2000/launch", json=payload)
+    status = client.get("/sap2000/status")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["connected"] is True
+    assert second.json()["launched_by_bridge"] is True
+    assert status.json()["connected"] is True
+    assert status.json()["launched_by_bridge"] is True
+    assert status.json()["model_open"] is False
 
 
 def test_invalid_model_path_error_shape() -> None:
