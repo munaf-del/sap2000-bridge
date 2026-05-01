@@ -24,6 +24,8 @@ REQUIRED_PATHS = {
     "/sap2000/analyze/status/{job_id}",
     "/sap2000/analyse/status/{job_id}",
     "/sap2000/results/joint-reactions",
+    "/sap2000/results/frame-forces",
+    "/sap2000/results/modal-periods",
 }
 
 
@@ -65,6 +67,8 @@ def test_success_routes_include_correlation_id() -> None:
         analyse_response,
         client.get(f"/sap2000/analyse/status/{analyse_response.json()['job_id']}"),
         client.get("/sap2000/results/joint-reactions", params={"point_name": "J1"}),
+        client.get("/sap2000/results/frame-forces"),
+        client.get("/sap2000/results/modal-periods"),
     ]
 
     for response in successful_responses:

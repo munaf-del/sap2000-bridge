@@ -12,7 +12,7 @@ from bridge.contracts.model import (
     SapStatusResponse,
     SectionListResponse,
 )
-from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
+from bridge.contracts.results import AnalysisJobStatus, FrameForceSetResponse, JointReactionSet, ModalPeriodSetResponse
 from bridge.errors import BridgeError
 
 
@@ -88,4 +88,15 @@ class UnavailableSapAdapter(SapAdapter):
         case_names: list[str],
         combo_names: list[str],
     ) -> JointReactionSet:
+        raise self._error
+
+    def extract_frame_forces(
+        self,
+        frame_name: str | None,
+        case_names: list[str],
+        combo_names: list[str],
+    ) -> FrameForceSetResponse:
+        raise self._error
+
+    def extract_modal_periods(self, case_names: list[str]) -> ModalPeriodSetResponse:
         raise self._error

@@ -30,7 +30,16 @@ from bridge.contracts.requests import (
     LaunchRequest,
     OpenModelRequest,
 )
-from bridge.contracts.results import AnalysisJobStatus, JointReactionRow, JointReactionSet
+from bridge.contracts.results import (
+    AnalysisJobStatus,
+    FrameForceRow,
+    FrameForceSetResponse,
+    JointReactionRow,
+    JointReactionSet,
+    JointReactionSetResponse,
+    ModalPeriodRow,
+    ModalPeriodSetResponse,
+)
 
 __all__ = [
     "AnalysisJobStatus",
@@ -38,6 +47,8 @@ __all__ = [
     "BridgeInfoResponse",
     "ConnectRequest",
     "ErrorEnvelope",
+    "FrameForceRow",
+    "FrameForceSetResponse",
     "Frame",
     "FrameListResponse",
     "FrameSection",
@@ -47,6 +58,7 @@ __all__ = [
     "JointListResponse",
     "JointReactionRow",
     "JointReactionSet",
+    "JointReactionSetResponse",
     "LaunchRequest",
     "LoadCase",
     "LoadCaseListResponse",
@@ -57,6 +69,8 @@ __all__ = [
     "LoadPatternListResponse",
     "Material",
     "MaterialListResponse",
+    "ModalPeriodRow",
+    "ModalPeriodSetResponse",
     "OpenModelRequest",
     "OpenModelResponse",
     "SapSessionInfo",

@@ -35,12 +35,52 @@ class JointReactionRow(BridgeModel):
     m3: float
 
 
-class JointReactionSet(BridgeModel):
+class ResultSetResponse(BridgeModel):
     model_path: str
     model_name: str
     version_label: str
     version_number: str
     adapter_mode: str
     units: UnitsInfo
-    rows: list[JointReactionRow] = Field(default_factory=list)
     correlation_id: str = ""
+
+
+class JointReactionSetResponse(ResultSetResponse):
+    rows: list[JointReactionRow] = Field(default_factory=list)
+
+
+JointReactionSet = JointReactionSetResponse
+
+
+class FrameForceRow(BridgeModel):
+    obj: str
+    obj_station: float
+    elm: str
+    elm_station: float
+    load_case: str
+    step_type: str
+    step_num: float
+    p: float
+    v2: float
+    v3: float
+    t: float
+    m2: float
+    m3: float
+
+
+class FrameForceSetResponse(ResultSetResponse):
+    rows: list[FrameForceRow] = Field(default_factory=list)
+
+
+class ModalPeriodRow(BridgeModel):
+    load_case: str
+    step_type: str
+    step_num: float
+    period: float
+    frequency: float
+    circular_frequency: float
+    eigenvalue: float
+
+
+class ModalPeriodSetResponse(ResultSetResponse):
+    rows: list[ModalPeriodRow] = Field(default_factory=list)

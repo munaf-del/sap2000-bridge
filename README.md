@@ -47,6 +47,8 @@ No model write-back is implemented. No route creates, modifies, assigns, deletes
 - `GET /sap2000/analyze/status/{job_id}`
 - `GET /sap2000/analyse/status/{job_id}`
 - `GET /sap2000/results/joint-reactions`
+- `GET /sap2000/results/frame-forces`
+- `GET /sap2000/results/modal-periods`
 
 AI agents must call only these approved bridge endpoints in the MVP.
 
@@ -84,6 +86,10 @@ Job status can be read from either alias:
 - `GET /sap2000/analyse/status/{job_id}`
 
 Real SAP2000 analysis is not implemented yet. The future COM adapter still contains placeholders only and must verify `Analyze.RunAnalysis` and any case-status calls against the installed SAP2000 27 API documentation and type library before use.
+
+## Results
+
+The MVP exposes read-only result endpoints for joint reactions, frame forces, and modal periods. Current responses are deterministic fake data for contract testing. Real result extraction remains placeholder-only until SAP2000 27 COM signatures are manually verified for result setup selection and result array/byref behavior.
 
 ## Setup
 

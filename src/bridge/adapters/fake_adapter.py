@@ -25,7 +25,15 @@ from bridge.contracts.model import (
     SapStatusResponse,
     SectionListResponse,
 )
-from bridge.contracts.results import AnalysisJobStatus, JointReactionRow, JointReactionSet
+from bridge.contracts.results import (
+    AnalysisJobStatus,
+    FrameForceRow,
+    FrameForceSetResponse,
+    JointReactionRow,
+    JointReactionSet,
+    ModalPeriodRow,
+    ModalPeriodSetResponse,
+)
 from bridge.errors import InvalidModelPathError, NoModelOpenError, NotConnectedError
 
 
@@ -260,14 +268,73 @@ class FakeSapAdapter(SapAdapter):
             for combo_name in combo_names
         )
         return JointReactionSet(
-            model_path=self._model_path or "",
-            model_name=self._model_name or "",
-            version_label=self._version_label,
-            version_number=self._version_number,
-            adapter_mode=self.adapter_mode,
-            units=self._units,
+            **self._metadata_envelope(),
             rows=rows,
         )
+
+    def extract_frame_forces(
+        self,
+        frame_name: str | None,
+        case_names: list[str],
+        combo_names: list[str],
+    ) -> FrameForceSetResponse:
+        self._require_model()
+        selected_frame = frame_name or "F1"
+        selected_cases = case_names or ["DEAD"]
+        rows = [
+            FrameForceRow(
+                obj=selected_frame,
+                obj_station=0.0,
+                elm=selected_frame,
+                elm_station=0.0,
+                load_case=case_name,
+                step_type="Max",
+                step_num=0.0,
+                p=-250.0,
+                v2=12.5,
+                v3=4.0,
+                t=0.2,
+                m2=35.0,
+                m3=18.0,
+            )
+            for case_name in selected_cases
+        ]
+        rows.extend(
+            FrameForceRow(
+                obj=selected_frame,
+                obj_station=3.0,
+                elm=selected_frame,
+                elm_station=3.0,
+                load_case=combo_name,
+                step_type="Combo",
+                step_num=0.0,
+                p=-375.0,
+                v2=18.75,
+                v3=6.0,
+                t=0.3,
+                m2=52.5,
+                m3=27.0,
+            )
+            for combo_name in combo_names
+        )
+        return FrameForceSetResponse(**self._metadata_envelope(), rows=rows)
+
+    def extract_modal_periods(self, case_names: list[str]) -> ModalPeriodSetResponse:
+        self._require_model()
+        selected_cases = case_names or ["MODAL"]
+        rows = [
+            ModalPeriodRow(
+                load_case=case_name,
+                step_type="Mode",
+                step_num=1.0,
+                period=0.85,
+                frequency=1.1764705882,
+                circular_frequency=7.3919827143,
+                eigenvalue=54.641406,
+            )
+            for case_name in selected_cases
+        ]
+        return ModalPeriodSetResponse(**self._metadata_envelope(), rows=rows)
 
     @property
     def _model_name(self) -> str | None:

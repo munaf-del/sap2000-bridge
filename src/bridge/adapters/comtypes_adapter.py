@@ -15,7 +15,7 @@ from bridge.contracts.model import (
     SapStatusResponse,
     SectionListResponse,
 )
-from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
+from bridge.contracts.results import AnalysisJobStatus, FrameForceSetResponse, JointReactionSet, ModalPeriodSetResponse
 from bridge.errors import BridgeError
 
 if sys.platform == "win32":  # pragma: no cover - comtypes is optional and not used in automated tests.
@@ -201,10 +201,36 @@ class ComtypesSapAdapter(SapAdapter):
         case_names: list[str],
         combo_names: list[str],
     ) -> JointReactionSet:
+        # Likely setup calls: Results.Setup.DeselectAllCasesAndCombosForOutput,
+        # Results.Setup.SetCaseSelectedForOutput, Results.Setup.SetComboSelectedForOutput.
+        # Likely result call: Results.JointReact.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("extract_joint_reactions")
+
+    def extract_frame_forces(
+        self,
+        frame_name: str | None,
+        case_names: list[str],
+        combo_names: list[str],
+    ) -> FrameForceSetResponse:
+        # Likely setup calls: Results.Setup.DeselectAllCasesAndCombosForOutput,
+        # Results.Setup.SetCaseSelectedForOutput, Results.Setup.SetComboSelectedForOutput.
+        # Likely result call: Results.FrameForce.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("extract_frame_forces")
+
+    def extract_modal_periods(self, case_names: list[str]) -> ModalPeriodSetResponse:
+        # Likely setup calls: Results.Setup.DeselectAllCasesAndCombosForOutput,
+        # Results.Setup.SetCaseSelectedForOutput.
+        # Likely result call: Results.ModalPeriod.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("extract_modal_periods")
 
     @staticmethod
     def _placeholder(operation: str) -> BridgeError:

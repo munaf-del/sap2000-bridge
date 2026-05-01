@@ -13,7 +13,7 @@ from bridge.contracts.model import (
     SapStatusResponse,
     SectionListResponse,
 )
-from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
+from bridge.contracts.results import AnalysisJobStatus, FrameForceSetResponse, JointReactionSet, ModalPeriodSetResponse
 
 
 class SapAdapter(Protocol):
@@ -73,4 +73,15 @@ class SapAdapter(Protocol):
         case_names: list[str],
         combo_names: list[str],
     ) -> JointReactionSet:
+        ...
+
+    def extract_frame_forces(
+        self,
+        frame_name: str | None,
+        case_names: list[str],
+        combo_names: list[str],
+    ) -> FrameForceSetResponse:
+        ...
+
+    def extract_modal_periods(self, case_names: list[str]) -> ModalPeriodSetResponse:
         ...

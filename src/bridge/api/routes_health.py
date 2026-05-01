@@ -26,6 +26,8 @@ SUPPORTED_ENDPOINTS = [
     "GET /sap2000/analyze/status/{job_id}",
     "GET /sap2000/analyse/status/{job_id}",
     "GET /sap2000/results/joint-reactions",
+    "GET /sap2000/results/frame-forces",
+    "GET /sap2000/results/modal-periods",
 ]
 
 
