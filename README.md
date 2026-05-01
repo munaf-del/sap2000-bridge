@@ -32,7 +32,9 @@ Do not bind the bridge to `0.0.0.0` for the MVP.
 
 ## MVP Scope
 
-The MVP is read-only except for the fake analysis trigger. It can connect, launch, open a local `.sdb` path, read units, list joints, run analysis, and read results through approved endpoints.
+The MVP is read-only except for the analysis trigger contract. In fake mode, analysis and result endpoints exist for deterministic contract testing. In real COM mode, analysis and result extraction are not implemented yet.
+
+The real COM smoke scope can connect, launch only through the launch endpoint, open a local `.sdb` path, read units, and read basic model metadata through approved endpoints.
 
 No model write-back is implemented. No route creates, modifies, assigns, deletes, or saves SAP2000 model data.
 
@@ -129,7 +131,26 @@ Implemented for manual SAP2000 27 smoke verification:
 - list joints through the point-object smoke path.
 - read frame, material, section, load pattern, load case, and load combination metadata for manual verification.
 
-Manual smoke testing has confirmed connect, open-model, units, and joints for SAP2000 27.1.0 on port `8765`. The non-empty joint smoke model `C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb` returned two joints at 0 m and 5 m along the global X axis. Blank or newly created models may return `joints: []`; that is a valid read-only response. Frame, material, section, load pattern, load case, and load combination metadata are implemented for manual verification.
+Manual smoke testing has confirmed connect, open-model, units, joints, frames, materials, sections, load patterns, load cases, and load combinations for SAP2000 27.1.0 on port `8765`.
+
+Verified smoke model:
+
+```text
+C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb
+```
+
+Observed real COM metadata:
+
+- units: `kN_m_C`, length `m`, force `kN`, moment `kN-m`, temperature `C`;
+- joints: `1` at `(0.0, 0.0, 0.0)` and `2` at `(5.0, 0.0, 0.0)`;
+- frames: `1`, from joint `1` to joint `2`, section `FSEC1`;
+- materials: `A992Fy50`, `4000Psi`, `A416Gr270`;
+- sections: `FSEC1`;
+- load patterns: `DEAD`;
+- load cases: `DEAD`, `MODAL`;
+- load combinations: `[]`.
+
+Blank or newly created models may return `joints: []`, and models with no response combinations may return `load_combinations: []`; both are valid read-only responses. Audit records were created successfully for connect, open-model, joints, frames, materials, sections, load patterns, load cases, and load combinations.
 
 Still not implemented in real COM mode:
 

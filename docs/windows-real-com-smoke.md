@@ -16,7 +16,28 @@ Implemented for manual verification:
 - List joints through the point-object smoke path.
 - Read frame, material, section, load pattern, load case, and load combination metadata for manual verification.
 
-Connect, open-model, units, and joints have been smoke-tested against SAP2000 27.1.0 on port `8765`. The non-empty joint smoke model `C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb` returned two joints at `(0.0, 0.0, 0.0)` and `(5.0, 0.0, 0.0)`. Joints may return an empty list for blank or newly created models. For the first non-empty metadata verification, use a simple model with at least two points or one frame.
+Connect, open-model, units, joints, frames, materials, sections, load patterns, load cases, and load combinations have been manually smoke-tested against SAP2000 27.1.0 on port `8765`.
+
+Verified smoke model:
+
+```text
+C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb
+```
+
+Observed real COM metadata:
+
+- units: `kN_m_C`, length `m`, force `kN`, moment `kN-m`, temperature `C`;
+- joints: `1` at `(0.0, 0.0, 0.0)` and `2` at `(5.0, 0.0, 0.0)`;
+- frames: `1`, from joint `1` to joint `2`, section `FSEC1`;
+- materials: `A992Fy50`, `4000Psi`, `A416Gr270`;
+- sections: `FSEC1`;
+- load patterns: `DEAD`;
+- load cases: `DEAD`, `MODAL`;
+- load combinations: `[]`.
+
+Joints may return an empty list for blank or newly created models. Load combinations may return `[]` when the model has no combinations. Audit records were created successfully for connect, open-model, joints, frames, materials, sections, load patterns, load cases, and load combinations.
+
+Analysis and result endpoints exist for fake/contract testing. Real COM analysis is not implemented yet. Real COM result extraction is not implemented yet.
 
 Still not implemented:
 
