@@ -1,4 +1,6 @@
 from collections.abc import Iterable
+from contextlib import contextmanager
+import logging
 from pathlib import Path, PureWindowsPath
 import shutil
 import sys
@@ -26,10 +28,13 @@ from bridge.errors import BridgeError, InvalidModelPathError, NoModelOpenError, 
 
 if sys.platform == "win32":  # pragma: no cover - comtypes is optional and not used in automated tests.
     try:
+        import comtypes as comtypes_module
         import comtypes.client as comtypes_client
     except ImportError:
+        comtypes_module = None
         comtypes_client = None
 else:  # pragma: no cover - keeps non-Windows imports clean.
+    comtypes_module = None
     comtypes_client = None
 
 
@@ -43,6 +48,8 @@ KNOWN_UNIT_LABELS: dict[int, str] = {
     # These common values are deliberately conservative; unknown values are returned raw.
     6: "kN_m_C",
 }
+
+logger = logging.getLogger(__name__)
 
 
 def check_ret(ret: int | None, operation: str, sap_context: str | None = None) -> None:
@@ -74,6 +81,7 @@ class ComtypesSapAdapter(SapAdapter):
         self.helper_progid = "SAP2000v1.Helper"
         self.csi_helper_progid = "CSiAPIv1.Helper"
         self.sap_object_progid = "CSI.SAP2000.API.SapObject"
+        self.helper_progid_used: str | None = None
         self.install_dir = self._settings.sap2000_install_dir
         self.exe_path = self._settings.sap2000_exe_path
         self.api_dll_path = self._settings.sap2000_api_dll_path
@@ -95,35 +103,47 @@ class ComtypesSapAdapter(SapAdapter):
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         if self._helper is None:
-            self._helper = self._call(
-                lambda: comtypes_client.CreateObject(self.helper_progid),  # type: ignore[union-attr]
-                operation="Helper.CreateObject",
-                sap_context=self.helper_progid,
-            )
+            last_error: Exception | None = None
+            for helper_progid in (self.helper_progid, self.csi_helper_progid):
+                try:
+                    with self._com_scope():
+                        self._helper = comtypes_client.CreateObject(helper_progid)  # type: ignore[union-attr]
+                    self.helper_progid_used = helper_progid
+                    logger.info("SAP2000 COM helper created with ProgID %s", helper_progid)
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    logger.debug("SAP2000 COM helper ProgID failed: %s", helper_progid, exc_info=True)
+            if self._helper is None:
+                raise BridgeError(
+                    http_status=503,
+                    bridge_code="ADAPTER_UNAVAILABLE",
+                    message="Could not create a SAP2000 COM helper with SAP2000v1.Helper or CSiAPIv1.Helper.",
+                    sap_context="comtypes.client.CreateObject(SAP2000v1.Helper|CSiAPIv1.Helper)",
+                    retryable=True,
+                ) from last_error
         return self._helper
 
     def attach_to_running(self) -> SapSessionInfo:
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        helper = self.create_helper()
-        try:
-            self._sap_object = helper.GetObject(self.sap_object_progid)
-        except Exception as exc:
-            raise BridgeError(
-                http_status=503,
-                bridge_code="SAP2000_NOT_RUNNING",
-                message=(
-                    "Could not attach to a running SAP2000 instance. Start SAP2000 manually or call "
-                    "/sap2000/launch with real COM explicitly enabled."
-                ),
-                sap_context=f"{self.helper_progid}.GetObject({self.sap_object_progid})",
-                retryable=True,
-            ) from exc
-        self._bind_sap_model()
-        self._connected = True
-        self._launched_by_bridge = False
-        return self.get_version()
+        with self._com_scope():
+            helper = self.create_helper()
+            try:
+                self._sap_object = helper.GetObject(self.sap_object_progid)
+            except Exception as exc:
+                raise BridgeError(
+                    http_status=503,
+                    bridge_code="SAP2000_NOT_RUNNING",
+                    message="Could not attach to a running SAP2000 instance.",
+                    sap_context="Helper.GetObject",
+                    retryable=True,
+                ) from exc
+            self._bind_sap_model()
+            self._connected = True
+            self._launched_by_bridge = False
+            return self.get_version()
 
     def connect(self, attach_to_running: bool = True, exe_path: str | None = None) -> SapSessionInfo:
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
@@ -156,33 +176,34 @@ class ComtypesSapAdapter(SapAdapter):
                 retryable=False,
             )
 
-        helper = self.create_helper()
-        try:
-            self._sap_object = helper.CreateObject(selected_exe)
-        except Exception as exc:
-            raise BridgeError(
-                http_status=502,
-                bridge_code="SAP2000_COM_ERROR",
-                message="SAP2000 helper could not create a SapObject for launch.",
-                sap_context=f"{self.helper_progid}.CreateObject({selected_exe})",
-                retryable=False,
-            ) from exc
+        with self._com_scope():
+            helper = self.create_helper()
+            try:
+                self._sap_object = helper.CreateObject(selected_exe)
+            except Exception as exc:
+                raise BridgeError(
+                    http_status=502,
+                    bridge_code="SAP2000_COM_ERROR",
+                    message="SAP2000 helper could not create a SapObject for launch.",
+                    sap_context="Helper.CreateObject",
+                    retryable=False,
+                ) from exc
 
-        # VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # VERIFY AGAINST SAP2000v1.tlb
-        # VERIFY comtypes tuple/byref behaviour on target machine
-        ret = self._call(
-            lambda: self._sap_object.ApplicationStart(),
-            operation="SapObject.ApplicationStart",
-            sap_context="cOAPI.ApplicationStart",
-        )
-        self._check_ret_result(ret, "SapObject.ApplicationStart", "cOAPI.ApplicationStart")
-        if startup_delay_s > 0:
-            time.sleep(startup_delay_s)
-        self._bind_sap_model(retries=10, delay_s=0.5)
-        self._connected = True
-        self._launched_by_bridge = True
-        return self.get_version()
+            # VERIFY AGAINST INSTALLED SAP2000 API CHM
+            # VERIFY AGAINST SAP2000v1.tlb
+            # VERIFY comtypes tuple/byref behaviour on target machine
+            ret = self._call(
+                lambda: self._sap_object.ApplicationStart(),
+                operation="SapObject.ApplicationStart",
+                sap_context="cOAPI.ApplicationStart",
+            )
+            self._check_ret_result(ret, "SapObject.ApplicationStart", "cOAPI.ApplicationStart")
+            if startup_delay_s > 0:
+                time.sleep(startup_delay_s)
+            self._bind_sap_model(retries=10, delay_s=0.5)
+            self._connected = True
+            self._launched_by_bridge = True
+            return self.get_version()
 
     def get_version(self) -> SapSessionInfo:
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
@@ -385,6 +406,24 @@ class ComtypesSapAdapter(SapAdapter):
     def _model_name(self) -> str | None:
         return PureWindowsPath(self._model_path).name if self._model_path else None
 
+    @contextmanager
+    def _com_scope(self):
+        initialized = False
+        if comtypes_module is not None:
+            try:
+                comtypes_module.CoInitialize()
+                initialized = True
+            except Exception:
+                logger.debug("COM initialization failed or was already incompatible on this thread.", exc_info=True)
+        try:
+            yield
+        finally:
+            if initialized:
+                try:
+                    comtypes_module.CoUninitialize()
+                except Exception:
+                    logger.debug("COM uninitialization failed.", exc_info=True)
+
     def _ensure_real_com_enabled(self) -> None:
         if sys.platform != "win32":
             raise BridgeError(
@@ -521,7 +560,14 @@ class ComtypesSapAdapter(SapAdapter):
 
     @staticmethod
     def _call(func, operation: str, sap_context: str):
+        initialized = False
         try:
+            if comtypes_module is not None:
+                try:
+                    comtypes_module.CoInitialize()
+                    initialized = True
+                except Exception:
+                    logger.debug("COM initialization failed or was already incompatible on this thread.", exc_info=True)
             return func()
         except BridgeError:
             raise
@@ -533,6 +579,12 @@ class ComtypesSapAdapter(SapAdapter):
                 sap_context=sap_context,
                 retryable=False,
             ) from exc
+        finally:
+            if initialized:
+                try:
+                    comtypes_module.CoUninitialize()
+                except Exception:
+                    logger.debug("COM uninitialization failed.", exc_info=True)
 
     def _check_ret_result(self, result, operation: str, sap_context: str) -> None:
         if isinstance(result, tuple):

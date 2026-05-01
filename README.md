@@ -20,6 +20,16 @@ SaaS / AI Agent / Codex
 
 SAP2000 is a Windows desktop application and current bridge control should happen on the same machine as SAP2000. The API binds to localhost only in normal use and must not be exposed as a network service.
 
+Do not bind the bridge to `0.0.0.0` for the MVP.
+
+## Port Layout
+
+- EngPlatform Web UI: `http://localhost:3000`
+- EngPlatform API: `http://localhost:4000`
+- EngPlatform Calc Engine: `http://localhost:8000`
+- SAP2000 Local Bridge: `http://127.0.0.1:8765`
+- SAP2000 Bridge Docs: `http://127.0.0.1:8765/docs`
+
 ## MVP Scope
 
 The MVP is read-only except for the fake analysis trigger. It can connect, launch, open a local `.sdb` path, read units, list joints, run analysis, and read results through approved endpoints.
@@ -159,18 +169,20 @@ pytest -q
 ## Run The API
 
 ```powershell
-python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8765 --reload
 ```
 
 Then open:
 
 ```text
-http://127.0.0.1:8000/health
+http://127.0.0.1:8765/health
 ```
 
 ## Windows And SAP2000 Notes
 
 The fake adapter is the default so the app imports cleanly on non-Windows machines. The first real SAP2000 smoke path is opt-in only and must be manually verified on the target Windows machine.
+
+Real SAP2000 COM mode must run in native Windows PowerShell. Do not run real COM mode in Docker, WSL, or Ubuntu.
 
 This machine has SAP2000 27 installed at:
 

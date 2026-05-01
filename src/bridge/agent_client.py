@@ -8,7 +8,7 @@ from urllib import parse, request
 class Sap2000BridgeAgentClient:
     """Restricted client for runtime agents that may only call approved endpoints."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:8000", timeout_s: float = 30.0) -> None:
+    def __init__(self, base_url: str = "http://127.0.0.1:8765", timeout_s: float = 30.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
 

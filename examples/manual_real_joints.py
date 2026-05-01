@@ -1,4 +1,4 @@
-"""Manual real-COM smoke: list joints from the currently opened SAP2000 model."""
+﻿"""Manual real-COM smoke: list joints from the currently opened SAP2000 model."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import os
 from urllib import parse, request
 
 
-BRIDGE_URL = os.environ.get("SAP2000_BRIDGE_URL", "http://127.0.0.1:8000")
+BRIDGE_URL = os.environ.get("SAP2000_BRIDGE_URL", "http://127.0.0.1:8765")
 
 
 def _require_real_com_enabled() -> None:

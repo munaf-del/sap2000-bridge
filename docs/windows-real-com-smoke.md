@@ -2,6 +2,8 @@
 
 This is a manual SAP2000 27 smoke path for the local bridge. It is not a CI test path and must never be run by automated pytest.
 
+Run real SAP2000 COM mode in native Windows PowerShell only. Do not run real COM mode in Docker, WSL, or Ubuntu. Do not bind the bridge to `0.0.0.0` for the MVP.
+
 ## Current Scope
 
 Implemented for manual verification:
@@ -68,7 +70,7 @@ $env:SAP2000_WORKSPACE = "C:\path\to\sap2000-smoke-workspace"
 
 ```powershell
 $env:SAP2000_BRIDGE_ADAPTER_MODE = "fake"
-python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8765
 ```
 
 ## Run The Bridge In Real COM Mode
@@ -76,7 +78,7 @@ python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8000
 ```powershell
 $env:SAP2000_BRIDGE_ADAPTER_MODE = "comtypes"
 $env:SAP2000_BRIDGE_ENABLE_REAL_COM = "1"
-python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn bridge.api.main:app --host 127.0.0.1 --port 8765
 ```
 
 If `SAP2000_BRIDGE_ENABLE_REAL_COM` is not `1`, comtypes mode returns `REAL_COM_DISABLED`.

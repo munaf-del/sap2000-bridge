@@ -43,6 +43,12 @@ def test_agent_client_has_no_writeback_or_raw_escape_methods() -> None:
     assert not [name for name in methods if "patch" in name or "writeback" in name]
 
 
+def test_agent_client_default_base_url_uses_sap2000_bridge_port() -> None:
+    client = Sap2000BridgeAgentClient()
+
+    assert client.base_url == "http://127.0.0.1:8765"
+
+
 def test_agent_client_allowed_methods_call_correct_endpoints() -> None:
     client = RecordingAgentClient()
 

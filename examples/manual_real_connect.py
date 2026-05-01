@@ -1,4 +1,4 @@
-"""Manual real-COM smoke: attach to an already-running SAP2000 instance.
+﻿"""Manual real-COM smoke: attach to an already-running SAP2000 instance.
 
 Start the bridge separately with:
 SAP2000_BRIDGE_ADAPTER_MODE=comtypes
@@ -12,7 +12,7 @@ import os
 from urllib import request
 
 
-BRIDGE_URL = os.environ.get("SAP2000_BRIDGE_URL", "http://127.0.0.1:8000")
+BRIDGE_URL = os.environ.get("SAP2000_BRIDGE_URL", "http://127.0.0.1:8765")
 
 
 def _require_real_com_enabled() -> None:
