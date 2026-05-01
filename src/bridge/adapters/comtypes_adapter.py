@@ -1,26 +1,35 @@
+import sys
+
 from bridge.adapters.base import SapAdapter
+from bridge.config import Settings, get_settings
 from bridge.contracts.common import UnitsInfo
 from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatusResponse
 from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
 from bridge.errors import BridgeError
 
-try:  # pragma: no cover - SAP2000/comtypes is intentionally optional for tests.
-    import comtypes.client as comtypes_client
-except ImportError:  # pragma: no cover
+if sys.platform == "win32":  # pragma: no cover - comtypes is optional and not used in automated tests.
+    try:
+        import comtypes.client as comtypes_client
+    except ImportError:
+        comtypes_client = None
+else:  # pragma: no cover - keeps non-Windows imports clean.
     comtypes_client = None
 
 
 VERIFY_CHM = "VERIFY AGAINST INSTALLED SAP2000 API CHM"
+VERIFY_TLB = "VERIFY AGAINST SAP2000v1.tlb"
 VERIFY_COMTYPES = "VERIFY comtypes tuple/byref behaviour on target machine"
+VERIFY_ALL = f"{VERIFY_CHM}; {VERIFY_TLB}; {VERIFY_COMTYPES}"
 
 
-def check_ret(ret: int | None, context: str) -> None:
+def check_ret(ret: int | None, operation: str, sap_context: str | None = None) -> None:
     """Normalize every SAP2000 return code before callers see it."""
     if ret not in (None, 0):
+        context = sap_context or operation
         raise BridgeError(
             http_status=502,
             bridge_code="SAP2000_RETURN_CODE",
-            message=f"SAP2000 API call failed during {context}.",
+            message=f"SAP2000 API call failed during {operation}.",
             sap_ret=ret,
             sap_context=context,
             retryable=False,
@@ -36,23 +45,48 @@ class ComtypesSapAdapter(SapAdapter):
 
     adapter_mode = "comtypes"
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
+        self._settings = settings or get_settings()
+        self.helper_progid = "SAP2000v1.Helper"
+        self.csi_helper_progid = "CSiAPIv1.Helper"
+        self.sap_object_progid = "CSI.SAP2000.API.SapObject"
+        self.install_dir = self._settings.sap2000_install_dir
+        self.exe_path = self._settings.sap2000_exe_path
+        self.api_dll_path = self._settings.sap2000_api_dll_path
+        self.csi_api_dll_path = self._settings.csi_api_dll_path
+        self.oapi_chm_path = self._settings.sap2000_oapi_chm_path
         if comtypes_client is None:
             raise BridgeError(
                 http_status=503,
-                bridge_code="COMTYPES_UNAVAILABLE",
-                message="comtypes is not installed. Use the fake adapter or install the sap2000 optional extra.",
+                bridge_code="ADAPTER_UNAVAILABLE",
+                message=(
+                    "ComtypesSapAdapter is unavailable because comtypes is not installed or this is not Windows. "
+                    "Use the fake adapter or install the Windows-only sap2000 optional extra."
+                ),
                 retryable=True,
             )
         self._helper = None
         self._sap_object = None
         self._sap_model = None
 
-    def connect(self, attach_to_running: bool = True, exe_path: str | None = None) -> SapSessionInfo:
-        # helper creation: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # attach to running SAP2000: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # get version: VERIFY AGAINST INSTALLED SAP2000 API CHM
+    def create_helper(self) -> object:
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("create_helper")
+
+    def attach_to_running(self) -> SapSessionInfo:
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("attach_to_running")
+
+    def connect(self, attach_to_running: bool = True, exe_path: str | None = None) -> SapSessionInfo:
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        if attach_to_running:
+            return self.attach_to_running()
         raise self._placeholder("connect")
 
     def launch(
@@ -61,32 +95,38 @@ class ComtypesSapAdapter(SapAdapter):
         visible: bool = True,
         startup_delay_s: float = 3.0,
     ) -> SapSessionInfo:
-        # helper creation: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # create/launch SAP2000: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # get version: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("launch")
 
+    def get_version(self) -> SapSessionInfo:
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("get_version")
+
     def status(self) -> SapStatusResponse:
-        # get version/model state: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("status")
 
     def open_model(self, path: str, copy_to_workspace: bool = False) -> OpenModelResponse:
-        # open model: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # get present units: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # get database units: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("open_model")
 
     def get_units(self) -> UnitsInfo:
-        # get present units: VERIFY AGAINST INSTALLED SAP2000 API CHM
-        # get database units: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("get_units")
 
     def list_joints(self, csys: str = "Global", include_restraints: bool = False) -> JointListResponse:
-        # list joints: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("list_joints")
 
@@ -95,7 +135,8 @@ class ComtypesSapAdapter(SapAdapter):
         save_before_run: bool = False,
         case_names: list[str] | None = None,
     ) -> AnalysisJobStatus:
-        # run analysis: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("run_analysis")
 
@@ -105,7 +146,8 @@ class ComtypesSapAdapter(SapAdapter):
         case_names: list[str],
         combo_names: list[str],
     ) -> JointReactionSet:
-        # extract joint reactions: VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("extract_joint_reactions")
 
@@ -114,9 +156,6 @@ class ComtypesSapAdapter(SapAdapter):
         return BridgeError(
             http_status=501,
             bridge_code="SAP2000_COM_PLACEHOLDER",
-            message=(
-                f"ComtypesSapAdapter.{operation} is a placeholder. {VERIFY_CHM}; "
-                f"{VERIFY_COMTYPES}."
-            ),
+            message=f"ComtypesSapAdapter.{operation} is a placeholder. {VERIFY_ALL}.",
             retryable=False,
         )

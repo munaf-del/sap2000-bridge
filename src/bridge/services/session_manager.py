@@ -1,8 +1,10 @@
 from bridge.adapters.base import SapAdapter
 from bridge.adapters.fake_adapter import FakeSapAdapter
+from bridge.adapters.unavailable_adapter import UnavailableSapAdapter
 from bridge.config import get_settings
 from bridge.contracts.model import OpenModelResponse, SapSessionInfo, SapStatusResponse
 from bridge.contracts.requests import ConnectRequest, LaunchRequest, OpenModelRequest
+from bridge.errors import BridgeError
 
 
 class SessionManager:
@@ -19,7 +21,10 @@ class SessionManager:
         else:
             from bridge.adapters.comtypes_adapter import ComtypesSapAdapter
 
-            self.adapter = ComtypesSapAdapter()
+            try:
+                self.adapter = ComtypesSapAdapter(settings=settings)
+            except BridgeError as exc:
+                self.adapter = UnavailableSapAdapter(requested_mode=settings.adapter_mode, error=exc)
         self._last_status = None
         self.last_correlation_id = None
 
@@ -62,7 +67,10 @@ class SessionManager:
         return response
 
     def _is_connected(self) -> bool:
-        return self.adapter.status().connected
+        try:
+            return self.adapter.status().connected
+        except BridgeError:
+            return False
 
     def _record_status(self, response: SapStatusResponse, correlation_id: str) -> SapStatusResponse:
         response.correlation_id = correlation_id
