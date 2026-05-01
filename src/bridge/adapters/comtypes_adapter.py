@@ -1,10 +1,11 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import contextmanager
 import logging
 from pathlib import Path, PureWindowsPath
 import shutil
 import sys
 import time
+from typing import Any
 
 from bridge.adapters.base import SapAdapter
 from bridge.config import Settings, get_settings
@@ -24,7 +25,7 @@ from bridge.contracts.model import (
     SectionListResponse,
 )
 from bridge.contracts.results import AnalysisJobStatus, FrameForceSetResponse, JointReactionSet, ModalPeriodSetResponse
-from bridge.errors import BridgeError, InvalidModelPathError, NoModelOpenError, NotConnectedError
+from bridge.errors import BridgeError, NoModelOpenError, NotConnectedError
 
 if sys.platform == "win32":  # pragma: no cover - comtypes is optional and not used in automated tests.
     try:
@@ -47,6 +48,11 @@ KNOWN_UNIT_LABELS: dict[int, str] = {
     # TODO: finalize SAP2000 27 eUnits enum mapping from CSI_OAPI_Documentation.chm and SAP2000v1.tlb.
     # These common values are deliberately conservative; unknown values are returned raw.
     6: "kN_m_C",
+}
+
+KNOWN_UNIT_COMPONENTS: dict[int, dict[str, str]] = {
+    # SAP2000 27 smoke verification observed raw enum 6 as kN_m_C.
+    6: {"length": "m", "force": "kN", "moment": "kN-m", "temperature": "C"},
 }
 
 logger = logging.getLogger(__name__)
@@ -215,8 +221,7 @@ class ComtypesSapAdapter(SapAdapter):
             operation="SapModel.GetVersion",
             sap_context="cSapModel.GetVersion",
         )
-        values = self._values_from_result(result, "SapModel.GetVersion", "cSapModel.GetVersion")
-        version_label, version_number = self._parse_version_values(values)
+        version_label, version_number = self._parse_get_version_result(result)
         self._version_label = version_label
         self._version_number = version_number
         return SapSessionInfo(
@@ -280,22 +285,38 @@ class ComtypesSapAdapter(SapAdapter):
             operation="SapModel.GetDatabaseUnits",
             sap_context="cSapModel.GetDatabaseUnits",
         )
-        present_raw = self._single_value_from_result(
-            present_result,
-            "SapModel.GetPresentUnits",
-            "cSapModel.GetPresentUnits",
-        )
-        database_raw = self._single_value_from_result(
-            database_result,
-            "SapModel.GetDatabaseUnits",
-            "cSapModel.GetDatabaseUnits",
-        )
+        present_raw = self._single_value_from_result(present_result, "SapModel.GetPresentUnits")
+        database_raw = self._single_value_from_result(database_result, "SapModel.GetDatabaseUnits")
         self._units = self._units_from_raw(present_raw=present_raw, database_raw=database_raw)
         return self._units
 
     def list_joints(self, csys: str = "Global", include_restraints: bool = False) -> JointListResponse:
         self._require_model()
         units = self.get_units()
+        all_points = self._try_get_all_points(csys=csys)
+        if all_points is not None:
+            joints = [
+                JointInfo(
+                    name=name,
+                    coord_system=csys,
+                    x=x,
+                    y=y,
+                    z=z,
+                    units_ref=units.length,
+                    restraint=None,
+                )
+                for name, x, y, z in all_points
+            ]
+            return JointListResponse(
+                model_path=self._model_path or "",
+                model_name=self._model_name or "",
+                version_label=self._version_label or "",
+                version_number=self._version_number or "",
+                adapter_mode=self.adapter_mode,
+                units=units,
+                joints=joints,
+            )
+
         names = self._get_point_names()
         joints = [
             self._joint_from_name(name=name, csys=csys, include_restraints=include_restraints, units=units)
@@ -473,8 +494,29 @@ class ComtypesSapAdapter(SapAdapter):
 
     def _prepare_model_path(self, path: str, copy_to_workspace: bool) -> Path:
         model_path = Path(path)
-        if model_path.suffix.lower() != ".sdb" or not model_path.is_file():
-            raise InvalidModelPathError(path)
+        if model_path.suffix.lower() != ".sdb":
+            raise BridgeError(
+                http_status=400,
+                bridge_code="INVALID_MODEL_FILE",
+                message=f"Model path must point to a .sdb file: {path}",
+                retryable=False,
+            )
+        try:
+            source_exists = model_path.is_file()
+        except PermissionError as exc:
+            raise BridgeError(
+                http_status=423,
+                bridge_code="MODEL_FILE_LOCKED",
+                message=f"Model file could not be inspected because it is locked or inaccessible: {path}",
+                retryable=True,
+            ) from exc
+        if not source_exists:
+            raise BridgeError(
+                http_status=404,
+                bridge_code="MODEL_FILE_NOT_FOUND",
+                message=f"Model file was not found: {path}",
+                retryable=False,
+            )
         if not copy_to_workspace:
             return model_path
 
@@ -487,22 +529,80 @@ class ComtypesSapAdapter(SapAdapter):
             )
         workspace = Path(self._settings.sap2000_workspace)
         workspace.mkdir(parents=True, exist_ok=True)
-        copied_path = workspace / model_path.name
-        shutil.copy2(model_path, copied_path)
+        copied_path = self._unique_workspace_path(workspace=workspace, source_path=model_path)
+        try:
+            if not _same_file(model_path, copied_path):
+                shutil.copy2(model_path, copied_path)
+        except PermissionError as exc:
+            raise BridgeError(
+                http_status=423,
+                bridge_code="MODEL_FILE_LOCKED",
+                message=f"Model file could not be copied because it is locked or inaccessible: {path}",
+                retryable=True,
+            ) from exc
         return copied_path
 
-    def _get_point_names(self) -> list[str]:
-        # Preferred PointObj.GetAllPoints remains unimplemented until the exact tuple/byref shape is verified.
+    @staticmethod
+    def _unique_workspace_path(workspace: Path, source_path: Path) -> Path:
+        candidate = workspace / source_path.name
+        if _same_file(source_path, candidate):
+            return candidate
+        if not candidate.exists():
+            return candidate
+        stem = source_path.stem
+        suffix = source_path.suffix
+        for index in range(1, 1000):
+            candidate = workspace / f"{stem}-{index}{suffix}"
+            if not candidate.exists():
+                return candidate
+        raise BridgeError(
+            http_status=409,
+            bridge_code="MODEL_WORKSPACE_CONFLICT",
+            message=f"Could not choose a unique workspace filename for {source_path.name}.",
+            retryable=False,
+        )
+
+    def _try_get_all_points(self, csys: str) -> list[tuple[str, float, float, float]] | None:
+        # Preferred PointObj.GetAllPoints. SAP2000 27 may not expose this on all installations.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        result = self._call(
-            lambda: self._sap_model.PointObj.GetNameList(),
-            operation="PointObj.GetNameList",
-            sap_context="cPointObj.GetNameList",
-        )
-        values = self._values_from_result(result, "PointObj.GetNameList", "cPointObj.GetNameList")
-        return self._parse_name_list(values, "PointObj.GetNameList")
+        try:
+            result = self._call(
+                lambda: self._sap_model.PointObj.GetAllPoints(0, [], [], [], [], csys),
+                operation="PointObj.GetAllPoints",
+                sap_context="cPointObj.GetAllPoints",
+            )
+        except BridgeError as exc:
+            if exc.bridge_code == "SAP2000_COM_ERROR":
+                logger.debug("PointObj.GetAllPoints unavailable; falling back to GetNameList.", exc_info=True)
+                return None
+            raise
+        try:
+            return self._parse_get_all_points_result(result)
+        except BridgeError as exc:
+            if exc.bridge_code == "SAP2000_COM_SIGNATURE_UNVERIFIED":
+                logger.debug("PointObj.GetAllPoints signature uncertain; falling back to GetNameList.", exc_info=True)
+                return None
+            raise
+
+    def _get_point_names(self) -> list[str]:
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        try:
+            result = self._call(
+                lambda: self._sap_model.PointObj.GetNameList(0, []),
+                operation="PointObj.GetNameList",
+                sap_context="cPointObj.GetNameList",
+            )
+        except BridgeError:
+            result = self._call(
+                lambda: self._sap_model.PointObj.GetNameList(),
+                operation="PointObj.GetNameList",
+                sap_context="cPointObj.GetNameList",
+            )
+        return self._parse_get_name_list_result(result)
 
     def _joint_from_name(
         self,
@@ -514,20 +614,16 @@ class ComtypesSapAdapter(SapAdapter):
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
+        point_name = str(name)
         coord_result = self._call(
-            lambda: self._sap_model.PointObj.GetCoordCartesian(name, csys),
+            lambda: self._sap_model.PointObj.GetCoordCartesian(point_name, 0.0, 0.0, 0.0, csys),
             operation="PointObj.GetCoordCartesian",
-            sap_context=f"cPointObj.GetCoordCartesian({name})",
+            sap_context=f"cPointObj.GetCoordCartesian({point_name})",
         )
-        coords = self._values_from_result(
-            coord_result,
-            "PointObj.GetCoordCartesian",
-            f"cPointObj.GetCoordCartesian({name})",
-        )
-        x, y, z = self._parse_xyz(coords, name)
-        restraint = self._get_restraint(name) if include_restraints else None
+        x, y, z = self._parse_get_coord_cartesian_result(coord_result, point_name)
+        restraint = self._get_restraint(point_name) if include_restraints else None
         return JointInfo(
-            name=name,
+            name=point_name,
             coord_system=csys,
             x=x,
             y=y,
@@ -587,67 +683,108 @@ class ComtypesSapAdapter(SapAdapter):
                     logger.debug("COM uninitialization failed.", exc_info=True)
 
     def _check_ret_result(self, result, operation: str, sap_context: str) -> None:
-        if isinstance(result, tuple):
-            if len(result) == 1 and self._is_ret(result[0]):
-                check_ret(int(result[0]), operation, sap_context)
-                return
-            if self._has_ret_at_end(result):
-                check_ret(int(result[-1]), operation, sap_context)
-                return
-            if self._has_ret_at_start(result):
-                check_ret(int(result[0]), operation, sap_context)
-                return
+        ret = self._extract_ret_code(result)
+        if ret is None and self._is_ret(result):
+            ret = int(result)
+        check_ret(ret, operation, sap_context)
+
+    def _single_value_from_result(self, result, operation: str):
+        if not self._is_sequence(result):
+            return result
+        values = self._payload_without_ret(result, operation)
+        if len(values) != 1:
             raise self._signature_error(operation)
+        return values[0]
+
+    def _extract_ret_code(self, result: Any) -> int | None:
         if self._is_ret(result):
-            check_ret(int(result), operation, sap_context)
-            return
-        check_ret(None, operation, sap_context)
+            return int(result)
+        if not self._is_sequence(result) or not result:
+            return None
+        if self._is_ret(result[-1]):
+            return int(result[-1])
+        if self._is_ret(result[0]):
+            return int(result[0])
+        return None
 
-    def _values_from_result(self, result, operation: str, sap_context: str):
-        if isinstance(result, tuple):
-            if self._has_ret_at_end(result):
-                check_ret(int(result[-1]), operation, sap_context)
-                values = result[:-1]
-            elif self._has_ret_at_start(result):
-                check_ret(int(result[0]), operation, sap_context)
-                values = result[1:]
-            else:
-                values = result
-            if len(values) == 1:
-                return values[0]
-            return values
-        return result
+    def _is_success_ret(self, result: Any) -> bool:
+        ret = self._extract_ret_code(result)
+        return ret in (None, 0)
 
-    def _single_value_from_result(self, result, operation: str, sap_context: str):
-        values = self._values_from_result(result, operation, sap_context)
-        if isinstance(values, tuple):
-            if len(values) != 1:
-                raise self._signature_error(operation)
-            return values[0]
+    def _payload_without_ret(self, result: Any, operation: str) -> list[Any]:
+        if self._is_ret(result):
+            check_ret(int(result), operation)
+            return []
+        if not self._is_sequence(result):
+            return [result]
+
+        values = list(result)
+        if values and self._is_ret(values[-1]):
+            check_ret(int(values[-1]), operation)
+            return values[:-1]
+        if values and self._is_ret(values[0]):
+            check_ret(int(values[0]), operation)
+            return values[1:]
         return values
 
-    def _parse_version_values(self, values) -> tuple[str, str]:
-        if isinstance(values, tuple):
-            string_values = [str(value) for value in values if value is not None]
-        else:
-            string_values = [str(values)]
-        if not string_values:
+    def _parse_get_version_result(self, result: Any) -> tuple[str, str | float]:
+        values = self._payload_without_ret(result, "SapModel.GetVersion")
+        if not values:
             raise self._signature_error("SapModel.GetVersion")
-        version_label = string_values[0]
-        version_number = string_values[1] if len(string_values) > 1 else version_label
+        version_label = str(values[0])
+        version_number_raw = values[1] if len(values) > 1 else version_label
+        version_number: str | float
+        if isinstance(version_number_raw, (int, float)) and not isinstance(version_number_raw, bool):
+            version_number = float(version_number_raw)
+        else:
+            version_number = str(version_number_raw)
         return version_label, version_number
 
-    def _parse_name_list(self, values, operation: str) -> list[str]:
-        if isinstance(values, tuple):
-            for value in values:
-                names = self._coerce_name_list(value)
-                if names:
-                    return names
-        else:
-            names = self._coerce_name_list(values)
-            if names:
-                return names
-        raise self._signature_error(operation)
+    def _parse_get_name_list_result(self, result: Any) -> list[str]:
+        values = self._payload_without_ret(result, "PointObj.GetNameList")
+        count = self._first_int(values)
+        names: list[str] = []
+        for value in values:
+            if self._is_sequence(value):
+                names.extend(self._coerce_name_list(value))
+            elif isinstance(value, str):
+                names.append(value)
+        if count == 0 and not names:
+            return []
+        if names:
+            return names[:count] if count is not None and count >= 0 else names
+        raise self._signature_error("PointObj.GetNameList")
+
+    def _parse_get_coord_cartesian_result(self, result: Any, point_name: str) -> tuple[float, float, float]:
+        values = self._payload_without_ret(result, f"PointObj.GetCoordCartesian({point_name})")
+        numeric_values = [float(value) for value in values if isinstance(value, (int, float)) and not isinstance(value, bool)]
+        if len(numeric_values) < 3:
+            raise self._signature_error(f"PointObj.GetCoordCartesian({point_name})")
+        return numeric_values[0], numeric_values[1], numeric_values[2]
+
+    def _parse_get_all_points_result(self, result: Any) -> list[tuple[str, float, float, float]]:
+        values = self._payload_without_ret(result, "PointObj.GetAllPoints")
+        count = self._first_int(values)
+        if count == 0:
+            return []
+
+        sequences = [list(value) for value in values if self._is_sequence(value)]
+        if len(sequences) < 4:
+            raise self._signature_error("PointObj.GetAllPoints")
+
+        names = self._coerce_name_list(sequences[0])
+        x_values = self._coerce_float_list(sequences[1])
+        y_values = self._coerce_float_list(sequences[2])
+        z_values = self._coerce_float_list(sequences[3])
+        row_count = count if count is not None and count >= 0 else min(len(names), len(x_values), len(y_values), len(z_values))
+        if row_count == 0:
+            return []
+        if min(len(names), len(x_values), len(y_values), len(z_values)) < row_count:
+            raise self._signature_error("PointObj.GetAllPoints")
+        return [
+            (names[index], x_values[index], y_values[index], z_values[index])
+            for index in range(row_count)
+        ]
 
     @staticmethod
     def _coerce_name_list(value) -> list[str]:
@@ -657,6 +794,21 @@ class ComtypesSapAdapter(SapAdapter):
             names = [str(item) for item in value if isinstance(item, str) or item is not None]
             return [name for name in names if name]
         return []
+
+    @staticmethod
+    def _coerce_float_list(value) -> list[float]:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return [float(value)]
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+            return [float(item) for item in value if isinstance(item, (int, float)) and not isinstance(item, bool)]
+        return []
+
+    @staticmethod
+    def _first_int(values: list[Any]) -> int | None:
+        for value in values:
+            if isinstance(value, int) and not isinstance(value, bool):
+                return value
+        return None
 
     def _parse_xyz(self, values, point_name: str) -> tuple[float, float, float]:
         candidates = values if isinstance(values, tuple) else (values,)
@@ -679,6 +831,10 @@ class ComtypesSapAdapter(SapAdapter):
     def _is_ret(value) -> bool:
         return isinstance(value, int) and not isinstance(value, bool)
 
+    @staticmethod
+    def _is_sequence(value: Any) -> bool:
+        return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
+
     @classmethod
     def _has_ret_at_end(cls, values: tuple[object, ...]) -> bool:
         # A trailing 0 is the common successful SAP return-code shape. For longer
@@ -697,14 +853,16 @@ class ComtypesSapAdapter(SapAdapter):
     def _units_from_raw(present_raw, database_raw) -> UnitsInfo:
         present_label = ComtypesSapAdapter._unit_label(present_raw)
         database_label = ComtypesSapAdapter._unit_label(database_raw)
+        components = KNOWN_UNIT_COMPONENTS.get(present_raw if isinstance(present_raw, int) else -1, {})
         return UnitsInfo(
             present=present_label,
             database=database_label,
             present_raw=present_raw,
             database_raw=database_raw,
-            length="UNKNOWN",
-            force="UNKNOWN",
-            moment="UNKNOWN",
+            length=components.get("length", "UNKNOWN"),
+            force=components.get("force", "UNKNOWN"),
+            moment=components.get("moment", "UNKNOWN"),
+            temperature=components.get("temperature"),
         )
 
     @staticmethod
@@ -739,3 +897,10 @@ class ComtypesSapAdapter(SapAdapter):
             message=f"Could not interpret SAP2000 COM return values for {operation}. {VERIFY_ALL}.",
             retryable=False,
         )
+
+
+def _same_file(left: Path, right: Path) -> bool:
+    try:
+        return left.resolve() == right.resolve() or left.samefile(right)
+    except (FileNotFoundError, OSError):
+        return left.resolve() == right.resolve()

@@ -58,7 +58,7 @@ class SapStatusResponse(BridgeModel):
     model_path: str | None
     model_name: str | None
     version_label: str | None
-    version_number: str | None
+    version_number: float | str | None
     adapter_mode: str
     correlation_id: str
 
@@ -67,7 +67,7 @@ class SapSessionInfo(BridgeModel):
     connected: bool
     launched_by_bridge: bool
     version_label: str
-    version_number: str
+    version_number: float | str
     adapter_mode: str
     correlation_id: str = ""
 
@@ -77,7 +77,7 @@ class OpenModelResponse(BridgeModel):
     model_path: str
     model_name: str
     version_label: str
-    version_number: str
+    version_number: float | str
     adapter_mode: str
     units: UnitsInfo
     correlation_id: str = ""
@@ -106,7 +106,7 @@ class JointListResponse(BridgeModel):
     model_path: str
     model_name: str
     version_label: str
-    version_number: str
+    version_number: float | str
     adapter_mode: str
     units: UnitsInfo
     joints: list[JointInfo] = Field(default_factory=list)
@@ -117,7 +117,7 @@ class UnitsResponse(BridgeModel):
     model_path: str
     model_name: str
     version_label: str
-    version_number: str
+    version_number: float | str
     adapter_mode: str
     units: UnitsInfo
     correlation_id: str
@@ -127,7 +127,7 @@ class ModelMetadataResponse(BridgeModel):
     model_path: str
     model_name: str
     version_label: str
-    version_number: str
+    version_number: float | str
     adapter_mode: str
     units: UnitsInfo
     correlation_id: str = ""

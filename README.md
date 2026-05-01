@@ -126,7 +126,9 @@ Implemented for manual SAP2000 27 smoke verification:
 - read SAP2000 version;
 - open an existing local `.sdb` model, optionally after copying it to `SAP2000_WORKSPACE`;
 - read present/database units with raw enum values;
-- list joints through the point-object fallback path.
+- list joints through the point-object smoke path.
+
+Manual smoke testing has confirmed connect, open-model, and units for SAP2000 27 on port `8765`. Blank or newly created models may return `joints: []`; that is a valid read-only response. The first non-empty joint verification should use a simple model with at least two points or one frame.
 
 Still not implemented in real COM mode:
 

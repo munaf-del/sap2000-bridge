@@ -15,13 +15,46 @@ from bridge.services.session_manager import SessionManager, session_manager
 
 
 class MockSapModel:
+    def __init__(self, version_result=None, point_obj=None) -> None:
+        self.version_result = version_result if version_result is not None else ("SAP2000 v27", "27.0.0", 0)
+        self.PointObj = point_obj or MockPointObj()
+
     def GetVersion(self):
-        return ("SAP2000 v27", "27.0.0", 0)
+        return self.version_result
+
+    def GetPresentUnits(self):
+        return 6
+
+    def GetDatabaseUnits(self):
+        return 6
+
+
+class MockPointObj:
+    def __init__(self, name_list_result=None, coord_results=None, all_points_result=None, all_points_error=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+        self.coord_results = coord_results or {}
+        self.all_points_result = all_points_result
+        self.all_points_error = all_points_error or AttributeError("GetAllPoints")
+        self.coord_names: list[str] = []
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+    def GetAllPoints(self, *args):
+        if self.all_points_result is None:
+            raise self.all_points_error
+        return self.all_points_result
+
+    def GetCoordCartesian(self, name, *args):
+        self.coord_names.append(name)
+        if name not in self.coord_results:
+            raise RuntimeError(f"unknown point {name}")
+        return self.coord_results[name]
 
 
 class MockSapObject:
-    def __init__(self) -> None:
-        self.SapModel = MockSapModel()
+    def __init__(self, sap_model: MockSapModel | None = None) -> None:
+        self.SapModel = sap_model or MockSapModel()
         self.application_start_calls = 0
 
     def ApplicationStart(self):
@@ -282,6 +315,258 @@ def test_attach_failure_returns_standard_error_envelope(monkeypatch) -> None:
         session_manager.reset()
 
 
+def configured_comtypes_adapter(monkeypatch, sap_model: MockSapModel | None = None):
+    sap_object = MockSapObject(sap_model=sap_model)
+    helper = MockHelper(sap_object=sap_object)
+    client = MockComtypesClient(helper=helper)
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
+    monkeypatch.setattr(comtypes_adapter, "comtypes_client", client)
+    monkeypatch.setattr(comtypes_adapter, "comtypes_module", MockComtypesModule())
+    adapter = comtypes_adapter.ComtypesSapAdapter(settings=Settings(adapter_mode="comtypes", enable_real_com=True))
+    adapter._sap_object = sap_object
+    adapter._sap_model = sap_object.SapModel
+    adapter._connected = True
+    adapter._model_path = "C:/models/demo.sdb"
+    adapter._version_label = "27.1.0"
+    adapter._version_number = 27.1
+    return adapter, sap_object
+
+
+def test_get_version_normalizes_list_with_ret_code_last(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(version_result=["27.1.0", 27.1, 0]))
+
+    response = adapter.get_version()
+
+    assert response.version_label == "27.1.0"
+    assert response.version_number == 27.1
+
+
+def test_status_after_comtypes_connect_returns_normalized_version_number(monkeypatch) -> None:
+    sap_model = MockSapModel(version_result=["27.1.0", 27.1, 0])
+    sap_object = MockSapObject(sap_model=sap_model)
+    helper = MockHelper(sap_object=sap_object)
+    client = MockComtypesClient(helper=helper)
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
+    monkeypatch.setattr(comtypes_adapter, "comtypes_client", client)
+    monkeypatch.setattr(comtypes_adapter, "comtypes_module", MockComtypesModule())
+    monkeypatch.setattr(
+        session_manager_module,
+        "get_settings",
+        lambda: Settings(adapter_mode="comtypes", enable_real_com=True),
+    )
+    session_manager.reset()
+
+    try:
+        api_client = TestClient(app)
+        connect_response = api_client.post("/sap2000/connect", json={"attach_to_running": True})
+        status_response = api_client.get("/sap2000/status")
+
+        assert connect_response.status_code == 200
+        assert status_response.status_code == 200
+        assert status_response.json()["version_label"] == "27.1.0"
+        assert status_response.json()["version_number"] == 27.1
+    finally:
+        monkeypatch.setattr(
+            session_manager_module,
+            "get_settings",
+            lambda: Settings(adapter_mode="fake", enable_real_com=False),
+        )
+        session_manager.reset()
+
+
+def test_get_version_normalizes_tuple_with_ret_code_first(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(version_result=(0, "27.1.0", 27.1)))
+
+    response = adapter.get_version()
+
+    assert response.version_label == "27.1.0"
+    assert response.version_number == 27.1
+
+
+def test_units_enum_six_maps_verified_components(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    units = adapter.get_units()
+
+    assert units.present_raw == 6
+    assert units.database_raw == 6
+    assert units.present == "kN_m_C"
+    assert units.database == "kN_m_C"
+    assert units.length == "m"
+    assert units.force == "kN"
+    assert units.moment == "kN-m"
+    assert units.temperature == "C"
+
+
+def test_get_name_list_parsing_with_ret_code_last(monkeypatch) -> None:
+    point_obj = MockPointObj(name_list_result=[2, ("0", "1"), 0])
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    assert adapter._get_point_names() == ["0", "1"]
+
+
+def test_get_name_list_parsing_with_ret_code_first(monkeypatch) -> None:
+    point_obj = MockPointObj(name_list_result=[0, 2, ("0", "1")])
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    assert adapter._get_point_names() == ["0", "1"]
+
+
+def test_get_name_list_zero_points_returns_empty_list(monkeypatch) -> None:
+    point_obj = MockPointObj(name_list_result=[0, (), 0])
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    assert adapter._get_point_names() == []
+
+
+def test_get_coord_cartesian_parsing_with_ret_code_last(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    assert adapter._parse_get_coord_cartesian_result([1.0, 2.0, 3.0, 0], "P1") == (1.0, 2.0, 3.0)
+
+
+def test_get_coord_cartesian_parsing_with_ret_code_first(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    assert adapter._parse_get_coord_cartesian_result([0, 1.0, 2.0, 3.0], "P1") == (1.0, 2.0, 3.0)
+
+
+def test_point_name_int_zero_is_converted_to_string_before_coord_call(monkeypatch) -> None:
+    point_obj = MockPointObj(
+        name_list_result=[1, (0,), 0],
+        coord_results={"0": [1.0, 2.0, 3.0, 0]},
+    )
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    response = adapter.list_joints()
+
+    assert response.joints[0].name == "0"
+    assert point_obj.coord_names == ["0"]
+
+
+def test_empty_model_returns_empty_joints_without_coord_calls(monkeypatch) -> None:
+    point_obj = MockPointObj(name_list_result=[0, (), 0])
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    response = adapter.list_joints()
+
+    assert response.joints == []
+    assert point_obj.coord_names == []
+
+
+def test_get_all_points_zero_count_returns_empty_joints(monkeypatch) -> None:
+    point_obj = MockPointObj(all_points_result=[0, (), (), (), (), 0])
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    response = adapter.list_joints()
+
+    assert response.joints == []
+    assert point_obj.coord_names == []
+
+
+def test_get_all_points_valid_arrays_returns_joints(monkeypatch) -> None:
+    point_obj = MockPointObj(all_points_result=[2, ("P1", "P2"), (0.0, 1.0), (2.0, 3.0), (4.0, 5.0), 0])
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(point_obj=point_obj))
+
+    response = adapter.list_joints()
+
+    assert [joint.name for joint in response.joints] == ["P1", "P2"]
+    assert response.joints[1].x == 1.0
+    assert response.joints[1].y == 3.0
+    assert response.joints[1].z == 5.0
+    assert point_obj.coord_names == []
+
+
+def test_malformed_coordinate_tuple_returns_standard_error_envelope(monkeypatch) -> None:
+    point_obj = MockPointObj(name_list_result=[1, ("P1",), 0], coord_results={"P1": [1.0, 2.0, 0]})
+    sap_model = MockSapModel(point_obj=point_obj)
+    sap_object = MockSapObject(sap_model=sap_model)
+    helper = MockHelper(sap_object=sap_object)
+    client = MockComtypesClient(helper=helper)
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
+    monkeypatch.setattr(comtypes_adapter, "comtypes_client", client)
+    monkeypatch.setattr(comtypes_adapter, "comtypes_module", MockComtypesModule())
+    monkeypatch.setattr(
+        session_manager_module,
+        "get_settings",
+        lambda: Settings(adapter_mode="comtypes", enable_real_com=True),
+    )
+    session_manager.reset()
+    session_manager.adapter._sap_object = sap_object
+    session_manager.adapter._sap_model = sap_model
+    session_manager.adapter._connected = True
+    session_manager.adapter._model_path = "C:/models/demo.sdb"
+    session_manager.adapter._version_label = "27.1.0"
+    session_manager.adapter._version_number = 27.1
+
+    try:
+        response = TestClient(app).get("/sap2000/model/joints")
+        body = response.json()
+
+        assert response.status_code == 501
+        assert body["error"]["bridge_code"] == "SAP2000_COM_SIGNATURE_UNVERIFIED"
+        assert body["error"]["correlation_id"]
+    finally:
+        monkeypatch.setattr(
+            session_manager_module,
+            "get_settings",
+            lambda: Settings(adapter_mode="fake", enable_real_com=False),
+        )
+        session_manager.reset()
+
+
+def test_missing_sdb_path_returns_model_file_not_found(monkeypatch, tmp_path) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    with pytest.raises(BridgeError) as exc_info:
+        adapter._prepare_model_path(str(tmp_path / "missing.sdb"), copy_to_workspace=False)
+
+    assert exc_info.value.bridge_code == "MODEL_FILE_NOT_FOUND"
+
+
+def test_non_sdb_path_returns_invalid_model_file(monkeypatch, tmp_path) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+    file_path = tmp_path / "model.txt"
+    file_path.write_text("", encoding="utf-8")
+
+    with pytest.raises(BridgeError) as exc_info:
+        adapter._prepare_model_path(str(file_path), copy_to_workspace=False)
+
+    assert exc_info.value.bridge_code == "INVALID_MODEL_FILE"
+
+
+def test_copy_permission_error_returns_model_file_locked(monkeypatch, tmp_path) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+    source_path = tmp_path / "model.sdb"
+    source_path.write_text("", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    adapter._settings.sap2000_workspace = str(workspace)
+
+    def raise_permission_error(*args, **kwargs):
+        raise PermissionError("locked")
+
+    monkeypatch.setattr(comtypes_adapter.shutil, "copy2", raise_permission_error)
+
+    with pytest.raises(BridgeError) as exc_info:
+        adapter._prepare_model_path(str(source_path), copy_to_workspace=True)
+
+    assert exc_info.value.bridge_code == "MODEL_FILE_LOCKED"
+
+
+def test_copy_to_same_workspace_file_does_not_copy(monkeypatch, tmp_path) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+    source_path = tmp_path / "model.sdb"
+    source_path.write_text("", encoding="utf-8")
+    adapter._settings.sap2000_workspace = str(tmp_path)
+    copy_calls = []
+    monkeypatch.setattr(comtypes_adapter.shutil, "copy2", lambda *args, **kwargs: copy_calls.append(args))
+
+    prepared_path = adapter._prepare_model_path(str(source_path), copy_to_workspace=True)
+
+    assert prepared_path == source_path
+    assert copy_calls == []
+
+
 def test_manual_real_com_scripts_import_without_executing_com(monkeypatch) -> None:
     monkeypatch.delenv("SAP2000_BRIDGE_ENABLE_REAL_COM", raising=False)
     scripts = [
@@ -291,6 +576,7 @@ def test_manual_real_com_scripts_import_without_executing_com(monkeypatch) -> No
         "manual_real_units.py",
         "manual_real_joints.py",
         "manual_real_attach_diagnostics.py",
+        "manual_real_point_diagnostics.py",
     ]
 
     for script_name in scripts:

@@ -13,7 +13,9 @@ Implemented for manual verification:
 - Open a local `.sdb` model.
 - Read SAP2000 version.
 - Read present/database units with raw enum values.
-- List joints through the point-object fallback path.
+- List joints through the point-object smoke path.
+
+Connect, open-model, and units have been smoke-tested against SAP2000 27 on port `8765`. Joints may return an empty list for blank or newly created models. For the first non-empty joint verification, use a simple model with at least two points or one frame.
 
 Still not implemented:
 
@@ -136,6 +138,12 @@ python examples\manual_real_joints.py
 ```
 
 This uses the fallback point-object path. Signature-sensitive calls remain marked in code for verification against the installed CHM/TLB and comtypes tuple/byref behavior.
+
+For raw point diagnostics without launching, opening, saving, modifying, or running analysis:
+
+```powershell
+python examples\manual_real_point_diagnostics.py
+```
 
 ## Troubleshooting COM Registration
 
