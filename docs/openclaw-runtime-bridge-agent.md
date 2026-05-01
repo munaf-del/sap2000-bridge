@@ -1,6 +1,6 @@
 # OpenClaw Runtime Bridge Agent
 
-Use OpenClaw as a runtime bridge agent only. This is an operations role, not a coding role.
+Use OpenClaw as a runtime bridge agent only. This is an operations role, not a coding role. In the current phase, OpenClaw's runtime role is read-only.
 
 ## Instructions
 
@@ -14,6 +14,8 @@ Use OpenClaw as a runtime bridge agent only. This is an operations role, not a c
 - Do not call result extraction endpoints.
 - Do not call patch/apply endpoints.
 - Do not bind or ask the bridge to bind anywhere except `127.0.0.1`.
+
+Analysis endpoints and result extraction endpoints exist for fake/contract testing, but they are not approved for OpenClaw in the current real COM phase.
 
 ## Allowed Endpoints
 
@@ -63,4 +65,3 @@ If load combinations return `[]`, report that this is valid for the smoke model.
 ## Stop Rules
 
 Stop immediately if an operation would require direct COM/OAPI, direct `.sdb` editing, analysis, result extraction, patch/apply, save, overwrite, or any model mutation.
-

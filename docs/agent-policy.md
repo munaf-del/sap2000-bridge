@@ -59,13 +59,14 @@ Forbidden:
 
 ## Runtime Bridge Agent
 
-Allowed endpoints:
+The bridge has additional contract endpoints for fake analysis and fake result testing. Those contract endpoints exist, but they are not approved for runtime agents in the current real COM phase. Analysis and result extraction remain future phases.
+
+Current runtime-agent approved endpoints:
 
 - `GET /health`
 - `GET /bridge/info`
 - `GET /sap2000/status`
 - `POST /sap2000/connect`
-- `POST /sap2000/launch`
 - `POST /sap2000/open-model`
 - `GET /sap2000/model/units`
 - `GET /sap2000/model/joints`
@@ -75,13 +76,6 @@ Allowed endpoints:
 - `GET /sap2000/model/load-patterns`
 - `GET /sap2000/model/load-cases`
 - `GET /sap2000/model/load-combinations`
-- `POST /sap2000/analyze`
-- `POST /sap2000/analyse`
-- `GET /sap2000/analyze/status/{job_id}`
-- `GET /sap2000/analyse/status/{job_id}`
-- `GET /sap2000/results/joint-reactions`
-- `GET /sap2000/results/frame-forces`
-- `GET /sap2000/results/modal-periods`
 - `GET /sap2000/audit`
 - `GET /sap2000/audit/{audit_id}`
 
@@ -93,5 +87,7 @@ Forbidden:
 - writeback endpoints;
 - patch/apply;
 - create/modify/delete/assign;
+- analysis endpoints in the current phase;
+- result extraction endpoints in the current phase;
 - shell commands that launch SAP2000 unless explicitly approved;
 - interpreting results without units.

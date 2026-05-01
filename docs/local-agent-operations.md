@@ -27,6 +27,7 @@ Agents must not bypass the bridge. They must not directly access SAP2000 COM/OAP
 
 ## Current Verified State
 
+- 14B-1 Local Agent Smoke Script - PASSED
 - SAP2000 version: `27.1.0`
 - bridge: `http://127.0.0.1:8765`
 - adapter: `comtypes` for manual smoke, `fake` by default
@@ -41,6 +42,48 @@ Agents must not bypass the bridge. They must not directly access SAP2000 COM/OAP
 - load combinations: `0`
 
 Real analysis is not implemented. Real result extraction is not implemented. Write-back is disabled.
+
+## Recorded Agent Operation Results
+
+- Operation 14B-1 - Local Agent Smoke Script: PASSED.
+- Operation 14B-2 - OpenClaw Runtime Read-only Smoke: PASSED.
+- Prompt 14C - Codex Verification Agent Review: PASSED.
+
+Runtime summary from 14B-1 and 14B-2:
+
+- bridge online: yes;
+- adapter mode: `comtypes`;
+- SAP2000 version: `27.1.0`;
+- connected: yes;
+- model open: yes;
+- model path: `C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb`;
+- units: `kN_m_C`;
+- joint count: `2`;
+- frame count: `1`;
+- material count: `3`;
+- section count: `1`;
+- load pattern count: `1`;
+- load case count: `2`;
+- load combination count: `0`;
+- audit records: `41`;
+- errors: none.
+
+OpenClaw did not edit code, commit, run analysis, extract results, call patch/apply, save, write back, modify the model, or use direct COM/OAPI.
+
+Prompt 14C verified:
+
+- fake adapter remains default;
+- real COM is guarded by `adapter_mode=comtypes` and `SAP2000_BRIDGE_ENABLE_REAL_COM=1`;
+- bridge uses `127.0.0.1:8765`;
+- no operational code or script binds to `0.0.0.0`;
+- agent client has no `raw_request`;
+- agent client has no patch/apply/writeback methods;
+- OpenClaw prompt forbids direct COM/OAPI, `.sdb` editing, save/overwrite, analysis/results, and patch/apply;
+- README and smoke docs state real analysis, real result extraction, and write-back are not implemented;
+- scripts reference `127.0.0.1:8765`;
+- stop script does not touch port `8000`;
+- write-back endpoints remain disabled `501 WRITEBACK_DISABLED` stubs;
+- tests passed in fake mode and with outer COM environment variables set: `119 passed`.
 
 ## Allowed Runtime Operations
 
@@ -86,4 +129,3 @@ Stop and report to Marty if:
 - `scripts/stop_bridge.ps1`: stops only the process listening on `127.0.0.1:8765`.
 - `scripts/agent_readonly_smoke.ps1`: runs the approved read-only local smoke sequence.
 - `examples/agent_readonly_smoke.py`: Python equivalent using the restricted agent client.
-

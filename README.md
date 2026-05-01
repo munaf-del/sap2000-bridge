@@ -63,6 +63,8 @@ Local agent operations docs and scripts:
 
 The bridge remains local-only. Do not bind it to `0.0.0.0`. Runtime agents must not call analysis, result extraction, patch/apply, write-back, save, overwrite, create, modify, delete, assign, direct COM/OAPI, or direct `.sdb` editing unless a later approved phase explicitly changes scope.
 
+Operation 14B-1 Local Agent Smoke Script and Operation 14B-2 OpenClaw Runtime Read-only Smoke both passed against SAP2000 27.1.0 through the local bridge. Prompt 14C Codex Verification Agent Review also passed. Runtime agents must not call analysis or result extraction until a later approved phase.
+
 ## Endpoints
 
 - `GET /health`
