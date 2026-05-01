@@ -1,7 +1,18 @@
 from typing import Protocol
 
 from bridge.contracts.common import UnitsInfo
-from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatusResponse
+from bridge.contracts.model import (
+    FrameListResponse,
+    JointListResponse,
+    LoadCaseListResponse,
+    LoadCombinationListResponse,
+    LoadPatternListResponse,
+    MaterialListResponse,
+    OpenModelResponse,
+    SapSessionInfo,
+    SapStatusResponse,
+    SectionListResponse,
+)
 from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
 
 
@@ -29,6 +40,24 @@ class SapAdapter(Protocol):
         ...
 
     def list_joints(self, csys: str = "Global", include_restraints: bool = False) -> JointListResponse:
+        ...
+
+    def list_frames(self, csys: str = "Global") -> FrameListResponse:
+        ...
+
+    def list_materials(self) -> MaterialListResponse:
+        ...
+
+    def list_sections(self) -> SectionListResponse:
+        ...
+
+    def list_load_patterns(self) -> LoadPatternListResponse:
+        ...
+
+    def list_load_cases(self) -> LoadCaseListResponse:
+        ...
+
+    def list_load_combinations(self) -> LoadCombinationListResponse:
         ...
 
     def run_analysis(

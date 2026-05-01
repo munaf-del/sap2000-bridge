@@ -36,6 +36,12 @@ No model write-back is implemented. No route creates, modifies, assigns, deletes
 - `POST /sap2000/open-model`
 - `GET /sap2000/model/units`
 - `GET /sap2000/model/joints`
+- `GET /sap2000/model/frames`
+- `GET /sap2000/model/materials`
+- `GET /sap2000/model/sections`
+- `GET /sap2000/model/load-patterns`
+- `GET /sap2000/model/load-cases`
+- `GET /sap2000/model/load-combinations`
 - `POST /sap2000/analyze`
 - `POST /sap2000/analyse`
 - `GET /sap2000/results/joint-reactions`

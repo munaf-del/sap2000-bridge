@@ -3,7 +3,18 @@ import sys
 from bridge.adapters.base import SapAdapter
 from bridge.config import Settings, get_settings
 from bridge.contracts.common import UnitsInfo
-from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatusResponse
+from bridge.contracts.model import (
+    FrameListResponse,
+    JointListResponse,
+    LoadCaseListResponse,
+    LoadCombinationListResponse,
+    LoadPatternListResponse,
+    MaterialListResponse,
+    OpenModelResponse,
+    SapSessionInfo,
+    SapStatusResponse,
+    SectionListResponse,
+)
 from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
 from bridge.errors import BridgeError
 
@@ -129,6 +140,49 @@ class ComtypesSapAdapter(SapAdapter):
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("list_joints")
+
+    def list_frames(self, csys: str = "Global") -> FrameListResponse:
+        # Likely call family: FrameObj.GetAllFrames or fallback FrameObj.GetNameList +
+        # FrameObj.GetPoints + FrameObj.GetSection.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("list_frames")
+
+    def list_materials(self) -> MaterialListResponse:
+        # Likely call family: PropMaterial.GetNameList / GetMaterial.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("list_materials")
+
+    def list_sections(self) -> SectionListResponse:
+        # Likely call family: PropFrame.GetNameList.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("list_sections")
+
+    def list_load_patterns(self) -> LoadPatternListResponse:
+        # Likely call family: LoadPatterns.GetNameList / GetLoadType.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("list_load_patterns")
+
+    def list_load_cases(self) -> LoadCaseListResponse:
+        # Likely call family: LoadCases.GetNameList / GetTypeOAPI.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("list_load_cases")
+
+    def list_load_combinations(self) -> LoadCombinationListResponse:
+        # Likely call family: RespCombo.GetNameList / GetCaseList / GetTypeCombo.
+        # VERIFY AGAINST INSTALLED SAP2000 API CHM
+        # VERIFY AGAINST SAP2000v1.tlb
+        # VERIFY comtypes tuple/byref behaviour on target machine
+        raise self._placeholder("list_load_combinations")
 
     def run_analysis(
         self,

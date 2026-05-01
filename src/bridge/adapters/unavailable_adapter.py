@@ -1,6 +1,17 @@
 from bridge.adapters.base import SapAdapter
 from bridge.contracts.common import UnitsInfo
-from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatusResponse
+from bridge.contracts.model import (
+    FrameListResponse,
+    JointListResponse,
+    LoadCaseListResponse,
+    LoadCombinationListResponse,
+    LoadPatternListResponse,
+    MaterialListResponse,
+    OpenModelResponse,
+    SapSessionInfo,
+    SapStatusResponse,
+    SectionListResponse,
+)
 from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
 from bridge.errors import BridgeError
 
@@ -44,6 +55,24 @@ class UnavailableSapAdapter(SapAdapter):
         raise self._error
 
     def list_joints(self, csys: str = "Global", include_restraints: bool = False) -> JointListResponse:
+        raise self._error
+
+    def list_frames(self, csys: str = "Global") -> FrameListResponse:
+        raise self._error
+
+    def list_materials(self) -> MaterialListResponse:
+        raise self._error
+
+    def list_sections(self) -> SectionListResponse:
+        raise self._error
+
+    def list_load_patterns(self) -> LoadPatternListResponse:
+        raise self._error
+
+    def list_load_cases(self) -> LoadCaseListResponse:
+        raise self._error
+
+    def list_load_combinations(self) -> LoadCombinationListResponse:
         raise self._error
 
     def run_analysis(

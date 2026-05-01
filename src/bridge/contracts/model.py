@@ -121,3 +121,77 @@ class UnitsResponse(BridgeModel):
     adapter_mode: str
     units: UnitsInfo
     correlation_id: str
+
+
+class ModelMetadataResponse(BridgeModel):
+    model_path: str
+    model_name: str
+    version_label: str
+    version_number: str
+    adapter_mode: str
+    units: UnitsInfo
+    correlation_id: str = ""
+
+
+class Frame(BridgeModel):
+    name: str
+    start_joint: str
+    end_joint: str
+    section: str
+    coord_system: str
+
+
+class FrameListResponse(ModelMetadataResponse):
+    frames: list[Frame] = Field(default_factory=list)
+
+
+class Material(BridgeModel):
+    name: str
+    material_type: str
+
+
+class MaterialListResponse(ModelMetadataResponse):
+    materials: list[Material] = Field(default_factory=list)
+
+
+class FrameSection(BridgeModel):
+    name: str
+    shape_type: str
+    material: str
+
+
+class SectionListResponse(ModelMetadataResponse):
+    sections: list[FrameSection] = Field(default_factory=list)
+
+
+class LoadPattern(BridgeModel):
+    name: str
+    load_type: str
+    self_weight_multiplier: float
+
+
+class LoadPatternListResponse(ModelMetadataResponse):
+    load_patterns: list[LoadPattern] = Field(default_factory=list)
+
+
+class LoadCase(BridgeModel):
+    name: str
+    case_type: str
+
+
+class LoadCaseListResponse(ModelMetadataResponse):
+    load_cases: list[LoadCase] = Field(default_factory=list)
+
+
+class LoadCombinationItem(BridgeModel):
+    name: str
+    scale_factor: float
+
+
+class LoadCombination(BridgeModel):
+    name: str
+    items: list[LoadCombinationItem] = Field(default_factory=list)
+
+
+class LoadCombinationListResponse(ModelMetadataResponse):
+    load_combinations: list[LoadCombination] = Field(default_factory=list)

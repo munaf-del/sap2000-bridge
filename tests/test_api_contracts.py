@@ -13,6 +13,12 @@ REQUIRED_PATHS = {
     "/sap2000/open-model",
     "/sap2000/model/units",
     "/sap2000/model/joints",
+    "/sap2000/model/frames",
+    "/sap2000/model/materials",
+    "/sap2000/model/sections",
+    "/sap2000/model/load-patterns",
+    "/sap2000/model/load-cases",
+    "/sap2000/model/load-combinations",
     "/sap2000/analyze",
     "/sap2000/analyse",
     "/sap2000/results/joint-reactions",
@@ -20,7 +26,7 @@ REQUIRED_PATHS = {
 
 
 def test_success_routes_include_correlation_id() -> None:
-    session_manager.adapter.__init__()
+    session_manager.reset()
     client = TestClient(app)
 
     successful_responses = [
@@ -32,6 +38,12 @@ def test_success_routes_include_correlation_id() -> None:
         client.post("/sap2000/open-model", json={"path": "C:/models/demo.sdb", "copy_to_workspace": False}),
         client.get("/sap2000/model/units"),
         client.get("/sap2000/model/joints"),
+        client.get("/sap2000/model/frames"),
+        client.get("/sap2000/model/materials"),
+        client.get("/sap2000/model/sections"),
+        client.get("/sap2000/model/load-patterns"),
+        client.get("/sap2000/model/load-cases"),
+        client.get("/sap2000/model/load-combinations"),
         client.post("/sap2000/analyze", json={"save_before_run": False, "case_names": []}),
         client.post("/sap2000/analyse", json={"save_before_run": False, "case_names": []}),
         client.get("/sap2000/results/joint-reactions", params={"point_name": "J1"}),
