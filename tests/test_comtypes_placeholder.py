@@ -1,4 +1,6 @@
 import importlib
+import importlib.util
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,11 +33,12 @@ def test_fake_adapter_remains_default() -> None:
 
 
 def test_comtypes_mode_without_comtypes_returns_adapter_unavailable(monkeypatch) -> None:
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
     monkeypatch.setattr(comtypes_adapter, "comtypes_client", None)
     monkeypatch.setattr(
         session_manager_module,
         "get_settings",
-        lambda: Settings(adapter_mode="comtypes"),
+        lambda: Settings(adapter_mode="comtypes", enable_real_com=True),
     )
     session_manager.reset()
 
@@ -47,6 +50,34 @@ def test_comtypes_mode_without_comtypes_returns_adapter_unavailable(monkeypatch)
         assert response.status_code == 503
         assert body["error"]["http_status"] == 503
         assert body["error"]["bridge_code"] == "ADAPTER_UNAVAILABLE"
+        assert body["error"]["correlation_id"]
+    finally:
+        monkeypatch.setattr(
+            session_manager_module,
+            "get_settings",
+            lambda: Settings(adapter_mode="fake"),
+        )
+        session_manager.reset()
+
+
+def test_comtypes_mode_without_enable_flag_returns_real_com_disabled(monkeypatch) -> None:
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
+    monkeypatch.setattr(comtypes_adapter, "comtypes_client", object())
+    monkeypatch.setattr(
+        session_manager_module,
+        "get_settings",
+        lambda: Settings(adapter_mode="comtypes", enable_real_com=False),
+    )
+    session_manager.reset()
+
+    try:
+        client = TestClient(app)
+        response = client.post("/sap2000/connect", json={"attach_to_running": True})
+        body = response.json()
+
+        assert response.status_code == 503
+        assert body["error"]["http_status"] == 503
+        assert body["error"]["bridge_code"] == "REAL_COM_DISABLED"
         assert body["error"]["correlation_id"]
     finally:
         monkeypatch.setattr(
@@ -70,13 +101,34 @@ def test_check_ret_allows_success_and_rejects_failure() -> None:
 
 
 def test_comtypes_placeholder_mentions_required_verification(monkeypatch) -> None:
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
     monkeypatch.setattr(comtypes_adapter, "comtypes_client", object())
-    adapter = comtypes_adapter.ComtypesSapAdapter(settings=Settings())
+    adapter = comtypes_adapter.ComtypesSapAdapter(settings=Settings(enable_real_com=True))
 
     with pytest.raises(BridgeError) as exc_info:
-        adapter.create_helper()
+        adapter.list_frames()
 
     message = getattr(exc_info.value, "message")
     assert "VERIFY AGAINST INSTALLED SAP2000 API CHM" in message
     assert "VERIFY AGAINST SAP2000v1.tlb" in message
     assert "VERIFY comtypes tuple/byref behaviour on target machine" in message
+
+
+def test_manual_real_com_scripts_import_without_executing_com(monkeypatch) -> None:
+    monkeypatch.delenv("SAP2000_BRIDGE_ENABLE_REAL_COM", raising=False)
+    scripts = [
+        "manual_real_connect.py",
+        "manual_real_launch.py",
+        "manual_real_open_model.py",
+        "manual_real_units.py",
+        "manual_real_joints.py",
+    ]
+
+    for script_name in scripts:
+        script_path = Path(__file__).resolve().parents[1] / "examples" / script_name
+        spec = importlib.util.spec_from_file_location(script_name.removesuffix(".py"), script_path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        assert hasattr(module, "main")

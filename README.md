@@ -2,7 +2,7 @@
 
 This repository is the first read-only Python/FastAPI bridge for connecting a SaaS or AI engineering platform to SAP2000 running locally on Windows.
 
-The bridge exposes a narrow HTTP API on `127.0.0.1`, calls through a `SapAdapter` interface, and uses a deterministic `FakeSapAdapter` for tests. The future `ComtypesSapAdapter` is present only as a clearly marked placeholder until the exact SAP2000 OAPI signatures are verified against the installed SAP2000 API CHM, TLB, or DLLs.
+The bridge exposes a narrow HTTP API on `127.0.0.1`, calls through a `SapAdapter` interface, and uses a deterministic `FakeSapAdapter` for tests. `ComtypesSapAdapter` now has a guarded manual smoke path for a few SAP2000 27 read-only operations, but fake mode remains the default and automated tests never call real COM.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ SaaS / AI Agent / Codex
   -> localhost FastAPI bridge
   -> SapAdapter interface
   -> FakeSapAdapter for tests
-  -> future ComtypesSapAdapter for real SAP2000
+  -> guarded ComtypesSapAdapter for manual SAP2000 smoke verification
   -> SAP2000 desktop application
   -> .sdb model files
 ```
@@ -22,7 +22,7 @@ SAP2000 is a Windows desktop application and current bridge control should happe
 
 ## MVP Scope
 
-The MVP is read-only except for triggering analysis. It can connect, launch, open a local `.sdb` path, read units, list joints, run analysis, and read joint reactions through approved endpoints.
+The MVP is read-only except for the fake analysis trigger. It can connect, launch, open a local `.sdb` path, read units, list joints, run analysis, and read results through approved endpoints.
 
 No model write-back is implemented. No route creates, modifies, assigns, deletes, or saves SAP2000 model data.
 
@@ -87,11 +87,39 @@ Job status can be read from either alias:
 - `GET /sap2000/analyze/status/{job_id}`
 - `GET /sap2000/analyse/status/{job_id}`
 
-Real SAP2000 analysis is not implemented yet. The future COM adapter still contains placeholders only and must verify `Analyze.RunAnalysis` and any case-status calls against the installed SAP2000 27 API documentation and type library before use.
+Real SAP2000 analysis is not implemented yet. The COM adapter still keeps analysis as a placeholder and must verify `Analyze.RunAnalysis` and any case-status calls against the installed SAP2000 27 API documentation and type library before use.
 
 ## Results
 
 The MVP exposes read-only result endpoints for joint reactions, frame forces, and modal periods. Current responses are deterministic fake data for contract testing. Real result extraction remains placeholder-only until SAP2000 27 COM signatures are manually verified for result setup selection and result array/byref behavior.
+
+## Real COM Smoke Status
+
+Real COM mode is guarded and manual-only. `ComtypesSapAdapter` will execute SAP2000 COM calls only when all of these are true:
+
+- the bridge is running on Windows;
+- `comtypes` is installed;
+- `SAP2000_BRIDGE_ADAPTER_MODE=comtypes`;
+- `SAP2000_BRIDGE_ENABLE_REAL_COM=1`.
+
+Implemented for manual SAP2000 27 smoke verification:
+
+- helper creation through `SAP2000v1.Helper`;
+- attach to an already-running SAP2000 instance;
+- launch SAP2000 only through `POST /sap2000/launch`;
+- read SAP2000 version;
+- open an existing local `.sdb` model, optionally after copying it to `SAP2000_WORKSPACE`;
+- read present/database units with raw enum values;
+- list joints through the point-object fallback path.
+
+Still not implemented in real COM mode:
+
+- frame/material/section/load metadata extraction;
+- real analysis;
+- real result extraction;
+- any create, modify, assign, delete, save, or write-back operation.
+
+Manual instructions are in `docs/windows-real-com-smoke.md`. Automated tests intentionally do not launch SAP2000, open a real model, or call real COM.
 
 ## Audit And Safety
 
@@ -136,7 +164,7 @@ http://127.0.0.1:8000/health
 
 ## Windows And SAP2000 Notes
 
-The fake adapter is the default so the app imports cleanly on non-Windows machines. Real SAP2000 control must be added gradually in `ComtypesSapAdapter` only after checking the installed SAP2000 API documentation on the target Windows machine.
+The fake adapter is the default so the app imports cleanly on non-Windows machines. The first real SAP2000 smoke path is opt-in only and must be manually verified on the target Windows machine.
 
 This machine has SAP2000 27 installed at:
 
@@ -185,9 +213,9 @@ Read-only registry checks also found the expected COM ProgIDs:
 - `CSiAPIv1.Helper`
 - `CSI.SAP2000.API.SapObject`
 
-The default config records those paths, but the app still uses the fake adapter unless `SAP2000_BRIDGE_ADAPTER_MODE=comtypes` is set. Real COM calls remain placeholders.
+The default config records those paths, but the app still uses the fake adapter unless `SAP2000_BRIDGE_ADAPTER_MODE=comtypes` is set. Real COM calls are additionally blocked unless `SAP2000_BRIDGE_ENABLE_REAL_COM=1`.
 
-Before implementing real calls, verify:
+Before expanding real calls, verify:
 
 - helper creation;
 - attach to running SAP2000;
@@ -198,7 +226,7 @@ Before implementing real calls, verify:
 - get database units;
 - list joints;
 - run analysis;
-- extract joint reactions;
+- extract joint reactions, frame forces, and modal periods;
 - `comtypes` tuple/byref behavior;
 - all SAP return-code shapes.
 
@@ -208,4 +236,4 @@ Every SAP return code must go through `check_ret`.
 
 Real write-back is intentionally disabled. Future write-back requires preview, explicit human approval, backup, validation, and audit records before any model mutation endpoint is enabled.
 
-The COM adapter contains placeholders only. Do not treat those placeholders as final SAP2000 API signatures.
+The COM adapter still contains placeholders for every non-smoke operation. Do not treat those placeholders, or any unverified smoke-call tuple handling, as final SAP2000 API signatures.

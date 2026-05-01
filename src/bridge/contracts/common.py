@@ -10,6 +10,8 @@ class UnitsInfo(BridgeModel):
     # SAP2000 eUnits values into these stable strings.
     present: str
     database: str
+    present_raw: int | str | None = None
+    database_raw: int | str | None = None
     length: str
     force: str
     moment: str
