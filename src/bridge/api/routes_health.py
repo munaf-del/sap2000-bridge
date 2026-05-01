@@ -28,6 +28,8 @@ SUPPORTED_ENDPOINTS = [
     "GET /sap2000/results/joint-reactions",
     "GET /sap2000/results/frame-forces",
     "GET /sap2000/results/modal-periods",
+    "GET /sap2000/audit",
+    "GET /sap2000/audit/{audit_id}",
 ]
 
 

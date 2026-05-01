@@ -62,10 +62,14 @@ def error_envelope(error: BridgeError, correlation_id: str) -> dict[str, dict[st
 
 async def bridge_error_handler(request: Request, exc: BridgeError) -> JSONResponse:
     correlation_id = getattr(request.state, "correlation_id", "unknown")
-    return JSONResponse(
+    response = JSONResponse(
         status_code=exc.http_status,
         content=error_envelope(exc, correlation_id),
     )
+    response.headers["X-Bridge-Code"] = exc.bridge_code
+    if exc.sap_ret is not None:
+        response.headers["X-Sap-Ret"] = str(exc.sap_ret)
+    return response
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -76,7 +80,9 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
         message=str(exc.errors()),
         retryable=False,
     )
-    return JSONResponse(status_code=422, content=error_envelope(error, correlation_id))
+    response = JSONResponse(status_code=422, content=error_envelope(error, correlation_id))
+    response.headers["X-Bridge-Code"] = error.bridge_code
+    return response
 
 
 async def http_error_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
@@ -87,4 +93,6 @@ async def http_error_handler(request: Request, exc: StarletteHTTPException) -> J
         message=str(exc.detail),
         retryable=False,
     )
-    return JSONResponse(status_code=exc.status_code, content=error_envelope(error, correlation_id))
+    response = JSONResponse(status_code=exc.status_code, content=error_envelope(error, correlation_id))
+    response.headers["X-Bridge-Code"] = error.bridge_code
+    return response

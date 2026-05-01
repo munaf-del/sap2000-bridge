@@ -1,3 +1,4 @@
+from bridge.contracts.audit import AuditListResponse, AuditRecord, AuditRecordResponse
 from bridge.contracts.common import ErrorEnvelope, UnitsInfo
 from bridge.contracts.model import (
     BridgeInfoResponse,
@@ -44,6 +45,9 @@ from bridge.contracts.results import (
 __all__ = [
     "AnalysisJobStatus",
     "AnalysisRequest",
+    "AuditListResponse",
+    "AuditRecord",
+    "AuditRecordResponse",
     "BridgeInfoResponse",
     "ConnectRequest",
     "ErrorEnvelope",

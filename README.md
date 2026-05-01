@@ -49,6 +49,8 @@ No model write-back is implemented. No route creates, modifies, assigns, deletes
 - `GET /sap2000/results/joint-reactions`
 - `GET /sap2000/results/frame-forces`
 - `GET /sap2000/results/modal-periods`
+- `GET /sap2000/audit`
+- `GET /sap2000/audit/{audit_id}`
 
 AI agents must call only these approved bridge endpoints in the MVP.
 
@@ -90,6 +92,12 @@ Real SAP2000 analysis is not implemented yet. The future COM adapter still conta
 ## Results
 
 The MVP exposes read-only result endpoints for joint reactions, frame forces, and modal periods. Current responses are deterministic fake data for contract testing. Real result extraction remains placeholder-only until SAP2000 27 COM signatures are manually verified for result setup selection and result array/byref behavior.
+
+## Audit And Safety
+
+Every API route is audited to an in-memory MVP audit store with an audit ID, timestamp, correlation ID, method, route, action, status, adapter mode, optional model path, and optional bridge/SAP error details. Audit records are read-only through `GET /sap2000/audit` and `GET /sap2000/audit/{audit_id}`.
+
+Write-back remains disabled. `POST /sap2000/patches/preview` and `POST /sap2000/patches/apply` return `501 WRITEBACK_DISABLED` and do not mutate model state. Future write-back requires preview, explicit human approval, backup, validation, and audit before any model mutation endpoint can be enabled. Agents must not call patch/apply in the MVP.
 
 ## Setup
 

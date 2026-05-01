@@ -26,6 +26,10 @@ REQUIRED_PATHS = {
     "/sap2000/results/joint-reactions",
     "/sap2000/results/frame-forces",
     "/sap2000/results/modal-periods",
+    "/sap2000/audit",
+    "/sap2000/audit/{audit_id}",
+    "/sap2000/patches/preview",
+    "/sap2000/patches/apply",
 }
 
 
