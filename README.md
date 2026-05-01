@@ -26,6 +26,12 @@ The MVP is read-only except for the fake analysis trigger. It can connect, launc
 
 No model write-back is implemented. No route creates, modifies, assigns, deletes, or saves SAP2000 model data.
 
+## Agent Policy
+
+Runtime agents must use only the approved local bridge endpoints. They must not directly access SAP2000 COM/OAPI, directly edit `.sdb` files, call patch/apply endpoints, save or overwrite models, or interpret results without units.
+
+See `docs/agent-policy.md` for the Coding Agent, Verification Agent, and Runtime Bridge Agent rules. See `docs/checkpoint-workflow.md` for the fast checkpoint workflow used by Marty as the sole developer.
+
 ## Endpoints
 
 - `GET /health`
