@@ -22,6 +22,23 @@ SAP2000 is a Windows desktop application and current bridge control should happe
 
 Do not bind the bridge to `0.0.0.0` for the MVP.
 
+## CORS
+
+Browser calls from EngPlatform are allowed only from a strict local/explicit-origin CORS allowlist. The default allowed origins are:
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `http://localhost:4000`
+- `http://127.0.0.1:4000`
+
+If EngPlatform is running from Ubuntu/WSL and the browser origin is a specific office-machine address, add that exact origin explicitly:
+
+```powershell
+$env:SAP2000_BRIDGE_ALLOWED_ORIGINS = "http://10.0.1.252:3000"
+```
+
+Do not use wildcard CORS. Do not treat CORS as network exposure: the bridge still binds only to `127.0.0.1` on port `8765`.
+
 ## Port Layout
 
 - EngPlatform Web UI: `http://localhost:3000`

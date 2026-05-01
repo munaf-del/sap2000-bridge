@@ -2,7 +2,32 @@ from functools import lru_cache
 from typing import Literal
 
 from pydantic import AliasChoices, Field
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
+]
+
+
+def build_cors_origins(default_origins: list[str], extra_origins: str | None = None) -> list[str]:
+    origins: list[str] = []
+    for origin in [*default_origins, *_split_origins(extra_origins)]:
+        if origin == "*":
+            raise ValueError("Wildcard CORS origins are not allowed.")
+        if origin and origin not in origins:
+            origins.append(origin)
+    return origins
+
+
+def _split_origins(value: str | None) -> list[str]:
+    if not value:
+        return []
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
 
 
 class Settings(BaseSettings):
@@ -35,7 +60,16 @@ class Settings(BaseSettings):
     )
     read_only: bool = True
     writeback_enabled: bool = False
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://127.0.0.1", "http://localhost"])
+    cors_origins: list[str] = Field(default_factory=lambda: DEFAULT_CORS_ORIGINS.copy())
+    allowed_origins: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SAP2000_BRIDGE_ALLOWED_ORIGINS"),
+    )
+
+    @model_validator(mode="after")
+    def apply_explicit_allowed_origins(self) -> "Settings":
+        self.cors_origins = build_cors_origins(self.cors_origins, self.allowed_origins)
+        return self
 
 
 @lru_cache

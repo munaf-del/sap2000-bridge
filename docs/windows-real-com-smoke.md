@@ -4,6 +4,23 @@ This is a manual SAP2000 27 smoke path for the local bridge. It is not a CI test
 
 Run real SAP2000 COM mode in native Windows PowerShell only. Do not run real COM mode in Docker, WSL, or Ubuntu. Do not bind the bridge to `0.0.0.0` for the MVP.
 
+## Strict CORS For EngPlatform
+
+The bridge uses a strict CORS allowlist for browser integration with EngPlatform. By default, only these local origins are allowed:
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `http://localhost:4000`
+- `http://127.0.0.1:4000`
+
+If the EngPlatform browser UI is served from a specific Ubuntu/WSL office-machine origin, add that exact origin before starting the bridge:
+
+```powershell
+$env:SAP2000_BRIDGE_ALLOWED_ORIGINS = "http://10.0.1.252:3000"
+```
+
+Do not use wildcard CORS. This is only an Origin-header allowlist for browser requests; it does not expose the bridge on the network. The bridge must still bind only to `127.0.0.1:8765`.
+
 ## Current Scope
 
 Implemented for manual verification:
