@@ -1,0 +1,11 @@
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+uvicorn-*.log
+uvicorn-*.err.log
+
+.venv/
+dist/
+build/
+*.egg-info/
