@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Request
 
-from bridge.contracts.model import OpenModelResponse, SapSessionInfo, SapStatus
+from bridge.contracts.model import OpenModelResponse, SapSessionInfo, SapStatusResponse
 from bridge.contracts.requests import ConnectRequest, LaunchRequest, OpenModelRequest
 from bridge.services.session_manager import session_manager
 
 router = APIRouter(prefix="/sap2000")
 
 
-@router.get("/status", response_model=SapStatus)
-def status(request: Request) -> SapStatus:
+@router.get("/status", response_model=SapStatusResponse)
+def status(request: Request) -> SapStatusResponse:
     response = session_manager.adapter.status()
     response.correlation_id = request.state.correlation_id
     return response

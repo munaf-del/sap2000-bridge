@@ -9,7 +9,7 @@ def test_units_contract_forbids_extra_fields() -> None:
     with pytest.raises(ValidationError):
         UnitsInfo(
             present="kN_m_C",
-            database="N_mm_C",
+            database="kN_m_C",
             length="m",
             force="kN",
             moment="kN-m",

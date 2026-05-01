@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 
 from bridge.config import get_settings
-from bridge.contracts.model import BridgeInfo, HealthResponse
+from bridge.contracts.model import BridgeInfoResponse, HealthResponse
 from bridge.services.install_validator import inspect_sap2000_target
 
 router = APIRouter()
@@ -22,20 +22,27 @@ SUPPORTED_ENDPOINTS = [
 
 
 @router.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
+def health(request: Request) -> HealthResponse:
     settings = get_settings()
-    return HealthResponse(ok=True, service=settings.service_name, version=settings.bridge_version)
+    return HealthResponse(
+        ok=True,
+        service=settings.service_name,
+        version=settings.bridge_version,
+        correlation_id=request.state.correlation_id,
+    )
 
 
-@router.get("/bridge/info", response_model=BridgeInfo)
-def bridge_info(request: Request) -> BridgeInfo:
+@router.get("/bridge/info", response_model=BridgeInfoResponse)
+def bridge_info(request: Request) -> BridgeInfoResponse:
     settings = get_settings()
-    return BridgeInfo(
+    inspection = inspect_sap2000_target(settings)
+    return BridgeInfoResponse(
         bridge_version=settings.bridge_version,
         adapter_mode=settings.adapter_mode,
         read_only=settings.read_only,
         writeback_enabled=settings.writeback_enabled,
         supported_endpoints=SUPPORTED_ENDPOINTS,
-        sap2000_target=inspect_sap2000_target(settings),
+        sap2000_target=inspection.target,
+        install_validation=inspection.validation,
         correlation_id=request.state.correlation_id,
     )

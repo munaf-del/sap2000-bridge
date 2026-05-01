@@ -1,12 +1,15 @@
 from bridge.contracts.common import ErrorEnvelope, UnitsInfo
 from bridge.contracts.model import (
-    BridgeInfo,
+    BridgeInfoResponse,
     HealthResponse,
+    InstallValidation,
     JointInfo,
     JointListResponse,
     OpenModelResponse,
     SapSessionInfo,
-    SapStatus,
+    Sap2000TargetInfo,
+    SapStatusResponse,
+    UnitsResponse,
 )
 from bridge.contracts.requests import (
     AnalysisRequest,
@@ -19,10 +22,11 @@ from bridge.contracts.results import AnalysisJobStatus, JointReactionRow, JointR
 __all__ = [
     "AnalysisJobStatus",
     "AnalysisRequest",
-    "BridgeInfo",
+    "BridgeInfoResponse",
     "ConnectRequest",
     "ErrorEnvelope",
     "HealthResponse",
+    "InstallValidation",
     "JointInfo",
     "JointListResponse",
     "JointReactionRow",
@@ -31,6 +35,8 @@ __all__ = [
     "OpenModelRequest",
     "OpenModelResponse",
     "SapSessionInfo",
-    "SapStatus",
+    "Sap2000TargetInfo",
+    "SapStatusResponse",
     "UnitsInfo",
+    "UnitsResponse",
 ]

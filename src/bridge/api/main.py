@@ -1,16 +1,19 @@
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bridge.config import get_settings
-from bridge.errors import BridgeError, bridge_error_handler
+from bridge.errors import BridgeError, bridge_error_handler, http_error_handler, validation_error_handler
 from bridge.logging import configure_logging
 from bridge.api.routes_analysis import router as analysis_router
 from bridge.api.routes_health import router as health_router
 from bridge.api.routes_model import router as model_router
 from bridge.api.routes_results import router as results_router
 from bridge.api.routes_session import router as session_router
+from bridge.api.routes_writeback import router as writeback_router
 
 configure_logging()
 settings = get_settings()
@@ -22,6 +25,8 @@ app = FastAPI(
 )
 
 app.add_exception_handler(BridgeError, bridge_error_handler)
+app.add_exception_handler(RequestValidationError, validation_error_handler)
+app.add_exception_handler(StarletteHTTPException, http_error_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,3 +50,4 @@ app.include_router(session_router)
 app.include_router(model_router)
 app.include_router(analysis_router)
 app.include_router(results_router)
+app.include_router(writeback_router)

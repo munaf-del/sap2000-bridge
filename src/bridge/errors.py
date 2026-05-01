@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 @dataclass(slots=True)
@@ -34,6 +36,16 @@ class NoModelOpenError(BridgeError):
         )
 
 
+class InvalidModelPathError(BridgeError):
+    def __init__(self, path: str) -> None:
+        super().__init__(
+            http_status=400,
+            bridge_code="INVALID_MODEL_PATH",
+            message=f"Model path must point to a local .sdb file: {path}",
+            retryable=False,
+        )
+
+
 def error_envelope(error: BridgeError, correlation_id: str) -> dict[str, dict[str, object]]:
     return {
         "error": {
@@ -54,3 +66,25 @@ async def bridge_error_handler(request: Request, exc: BridgeError) -> JSONRespon
         status_code=exc.http_status,
         content=error_envelope(exc, correlation_id),
     )
+
+
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    error = BridgeError(
+        http_status=422,
+        bridge_code="VALIDATION_ERROR",
+        message=str(exc.errors()),
+        retryable=False,
+    )
+    return JSONResponse(status_code=422, content=error_envelope(error, correlation_id))
+
+
+async def http_error_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    error = BridgeError(
+        http_status=exc.status_code,
+        bridge_code="HTTP_ERROR",
+        message=str(exc.detail),
+        retryable=False,
+    )
+    return JSONResponse(status_code=exc.status_code, content=error_envelope(error, correlation_id))

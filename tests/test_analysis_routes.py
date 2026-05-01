@@ -20,6 +20,11 @@ def test_analyze() -> None:
     assert response.status_code == 200
     assert body["job_id"].startswith("fake-analysis-")
     assert body["state"] == "completed"
+    assert body["model_path"] == "C:/models/demo.sdb"
+    assert body["model_name"] == "demo.sdb"
+    assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
+    assert body["adapter_mode"] == "fake"
     assert body["submitted_at_utc"]
     assert body["started_at_utc"]
     assert body["finished_at_utc"]

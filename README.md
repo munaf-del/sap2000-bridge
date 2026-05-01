@@ -44,6 +44,28 @@ AI agents must call only these approved bridge endpoints in the MVP.
 
 `GET /bridge/info` also reports `sap2000_target`, a read-only validation summary for the configured local SAP2000 install. This is used to confirm the bridge is pointed at SAP2000 27 before the real adapter is implemented.
 
+## Contract Hardening
+
+All successful API responses are backed by Pydantic response models and include a `correlation_id`. SAP/model/result responses carry adapter and model context where applicable, including `adapter_mode`, `model_path`, `model_name`, `version_label`, `version_number`, and present/database units.
+
+Errors use one standard envelope:
+
+```json
+{
+  "error": {
+    "http_status": 409,
+    "bridge_code": "NO_MODEL_OPEN",
+    "message": "...",
+    "sap_ret": null,
+    "sap_context": null,
+    "retryable": false,
+    "correlation_id": "..."
+  }
+}
+```
+
+`GET /bridge/info` includes both `sap2000_target` path metadata and `install_validation` readiness flags for SAP2000 27. The validator is safe on machines without SAP2000 installed: missing files and COM registration are reported as false with warnings instead of crashing imports.
+
 ## Setup
 
 ```powershell

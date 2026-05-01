@@ -19,8 +19,13 @@ def test_units() -> None:
     body = response.json()
 
     assert response.status_code == 200
+    assert body["model_path"] == "C:/models/demo.sdb"
+    assert body["model_name"] == "demo.sdb"
+    assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
+    assert body["adapter_mode"] == "fake"
     assert body["units"]["present"] == "kN_m_C"
-    assert body["units"]["database"] == "N_mm_C"
+    assert body["units"]["database"] == "kN_m_C"
     assert body["units"]["length"] == "m"
     assert body["correlation_id"]
 
@@ -32,7 +37,10 @@ def test_joints() -> None:
 
     assert response.status_code == 200
     assert body["model_path"] == "C:/models/demo.sdb"
+    assert body["model_name"] == "demo.sdb"
     assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
+    assert body["adapter_mode"] == "fake"
     assert body["units"]["present"] == "kN_m_C"
     assert len(body["joints"]) == 4
     assert body["joints"][0]["name"] == "J1"
@@ -50,4 +58,14 @@ def test_no_model_open_error_shape() -> None:
     assert body["error"]["bridge_code"] == "NO_MODEL_OPEN"
     assert body["error"]["message"]
     assert body["error"]["retryable"] is False
+    assert body["error"]["correlation_id"]
+
+
+def test_joints_before_model_open_returns_standard_error() -> None:
+    client = prepared_client(open_model=False)
+    response = client.get("/sap2000/model/joints")
+    body = response.json()
+
+    assert response.status_code == 409
+    assert body["error"]["bridge_code"] == "NO_MODEL_OPEN"
     assert body["error"]["correlation_id"]

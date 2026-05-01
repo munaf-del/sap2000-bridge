@@ -16,7 +16,12 @@ def test_status_initial_state() -> None:
 
     assert response.status_code == 200
     assert body["connected"] is False
+    assert body["launched_by_bridge"] is False
     assert body["model_open"] is False
+    assert body["model_path"] is None
+    assert body["model_name"] is None
+    assert body["version_label"] is None
+    assert body["version_number"] is None
     assert body["adapter_mode"] == "fake"
     assert body["correlation_id"]
 
@@ -28,7 +33,9 @@ def test_connect() -> None:
 
     assert response.status_code == 200
     assert body["connected"] is True
+    assert body["launched_by_bridge"] is False
     assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
     assert body["adapter_mode"] == "fake"
     assert body["correlation_id"]
 
@@ -43,6 +50,7 @@ def test_launch() -> None:
 
     assert response.status_code == 200
     assert body["connected"] is True
+    assert body["launched_by_bridge"] is True
     assert body["version_number"] == "0.1.0-fake"
     assert body["correlation_id"]
 
@@ -60,6 +68,9 @@ def test_open_model() -> None:
     assert body["model_open"] is True
     assert body["model_path"] == "C:/models/demo.sdb"
     assert body["model_name"] == "demo.sdb"
+    assert body["version_label"] == "SAP2000 Fake Adapter v0.1"
+    assert body["version_number"] == "0.1.0-fake"
+    assert body["adapter_mode"] == "fake"
     assert body["units"]["present"] == "kN_m_C"
     assert body["correlation_id"]
 
@@ -78,4 +89,19 @@ def test_not_connected_error_shape() -> None:
     assert body["error"]["bridge_code"] == "NOT_CONNECTED"
     assert body["error"]["sap_ret"] is None
     assert body["error"]["sap_context"] is None
+    assert body["error"]["correlation_id"]
+
+
+def test_invalid_model_path_error_shape() -> None:
+    client = fresh_client()
+    client.post("/sap2000/connect", json={"attach_to_running": True})
+    response = client.post(
+        "/sap2000/open-model",
+        json={"path": "C:/models/not-a-model.txt", "copy_to_workspace": False},
+    )
+    body = response.json()
+
+    assert response.status_code == 400
+    assert body["error"]["http_status"] == 400
+    assert body["error"]["bridge_code"] == "INVALID_MODEL_PATH"
     assert body["error"]["correlation_id"]

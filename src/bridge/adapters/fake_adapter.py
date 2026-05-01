@@ -10,10 +10,10 @@ from bridge.contracts.model import (
     JointRestraint,
     OpenModelResponse,
     SapSessionInfo,
-    SapStatus,
+    SapStatusResponse,
 )
 from bridge.contracts.results import AnalysisJobStatus, JointReactionRow, JointReactionSet
-from bridge.errors import NoModelOpenError, NotConnectedError
+from bridge.errors import InvalidModelPathError, NoModelOpenError, NotConnectedError
 
 
 class FakeSapAdapter(SapAdapter):
@@ -21,21 +21,24 @@ class FakeSapAdapter(SapAdapter):
 
     def __init__(self) -> None:
         self._connected = False
+        self._launched_by_bridge = False
         self._model_path: str | None = None
         self._version_label = "SAP2000 Fake Adapter v0.1"
         self._version_number = "0.1.0-fake"
         self._units = UnitsInfo(
             present="kN_m_C",
-            database="N_mm_C",
+            database="kN_m_C",
             length="m",
             force="kN",
             moment="kN-m",
+            temperature="C",
         )
 
     def connect(self, attach_to_running: bool = True, exe_path: str | None = None) -> SapSessionInfo:
         self._connected = True
         return SapSessionInfo(
             connected=True,
+            launched_by_bridge=self._launched_by_bridge,
             version_label=self._version_label,
             version_number=self._version_number,
             adapter_mode=self.adapter_mode,
@@ -48,30 +51,40 @@ class FakeSapAdapter(SapAdapter):
         startup_delay_s: float = 3.0,
     ) -> SapSessionInfo:
         self._connected = True
+        self._launched_by_bridge = True
         return SapSessionInfo(
             connected=True,
+            launched_by_bridge=True,
             version_label=self._version_label,
             version_number=self._version_number,
             adapter_mode=self.adapter_mode,
         )
 
-    def status(self) -> SapStatus:
-        return SapStatus(
+    def status(self) -> SapStatusResponse:
+        return SapStatusResponse(
             connected=self._connected,
+            launched_by_bridge=self._launched_by_bridge,
             model_open=self._model_path is not None,
             model_path=self._model_path,
+            model_name=self._model_name,
             version_label=self._version_label if self._connected else None,
+            version_number=self._version_number if self._connected else None,
             adapter_mode=self.adapter_mode,
             correlation_id="",
         )
 
     def open_model(self, path: str, copy_to_workspace: bool = False) -> OpenModelResponse:
         self._require_connected()
+        if not path.lower().endswith(".sdb"):
+            raise InvalidModelPathError(path)
         self._model_path = path
         return OpenModelResponse(
             model_open=True,
             model_path=path,
-            model_name=PureWindowsPath(path).name,
+            model_name=self._model_name or PureWindowsPath(path).name,
+            version_label=self._version_label,
+            version_number=self._version_number,
+            adapter_mode=self.adapter_mode,
             units=self._units,
         )
 
@@ -92,7 +105,10 @@ class FakeSapAdapter(SapAdapter):
             joints[1].restraint = JointRestraint(u1=True, u2=True, u3=True, r1=False, r2=False, r3=False)
         return JointListResponse(
             model_path=self._model_path or "",
+            model_name=self._model_name or "",
             version_label=self._version_label,
+            version_number=self._version_number,
+            adapter_mode=self.adapter_mode,
             units=self._units,
             joints=joints,
         )
@@ -107,6 +123,11 @@ class FakeSapAdapter(SapAdapter):
         return AnalysisJobStatus(
             job_id=f"fake-analysis-{uuid4()}",
             state="completed",
+            model_path=self._model_path or "",
+            model_name=self._model_name or "",
+            version_label=self._version_label,
+            version_number=self._version_number,
+            adapter_mode=self.adapter_mode,
             submitted_at_utc=now,
             started_at_utc=now,
             finished_at_utc=now,
@@ -154,10 +175,17 @@ class FakeSapAdapter(SapAdapter):
         )
         return JointReactionSet(
             model_path=self._model_path or "",
+            model_name=self._model_name or "",
             version_label=self._version_label,
+            version_number=self._version_number,
+            adapter_mode=self.adapter_mode,
             units=self._units,
             rows=rows,
         )
+
+    @property
+    def _model_name(self) -> str | None:
+        return PureWindowsPath(self._model_path).name if self._model_path else None
 
     def _require_connected(self) -> None:
         if not self._connected:

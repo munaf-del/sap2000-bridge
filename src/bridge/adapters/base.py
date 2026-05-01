@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from bridge.contracts.common import UnitsInfo
-from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatus
+from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatusResponse
 from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
 
 
@@ -19,7 +19,7 @@ class SapAdapter(Protocol):
     ) -> SapSessionInfo:
         ...
 
-    def status(self) -> SapStatus:
+    def status(self) -> SapStatusResponse:
         ...
 
     def open_model(self, path: str, copy_to_workspace: bool = False) -> OpenModelResponse:

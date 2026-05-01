@@ -16,7 +16,7 @@ def test_inspect_sap2000_target_detects_required_files(tmp_path) -> None:
         (install_dir / name).write_text("", encoding="utf-8")
     (install_dir / "NativeAPI").mkdir()
 
-    target = inspect_sap2000_target(
+    inspection = inspect_sap2000_target(
         Settings(
             sap2000_install_dir=str(install_dir),
             sap2000_exe_path=str(install_dir / "SAP2000.exe"),
@@ -26,18 +26,18 @@ def test_inspect_sap2000_target_detects_required_files(tmp_path) -> None:
         )
     )
 
-    assert target.configured_version == "SAP2000 27"
-    assert target.all_required_present is True
-    assert target.native_api_dir_present is True
-    assert target.register_tool_present is True
-    assert isinstance(target.com_registration_ready, bool)
+    assert inspection.target.configured_version == "SAP2000 27"
+    assert inspection.validation.all_required_present is True
+    assert inspection.validation.native_api_present is True
+    assert inspection.validation.register_sap2000_present is True
+    assert isinstance(inspection.validation.com_registration_ready, bool)
 
 
 def test_inspect_sap2000_target_fails_closed_for_missing_files(tmp_path) -> None:
     install_dir = tmp_path / "SAP2000 27"
     install_dir.mkdir()
 
-    target = inspect_sap2000_target(
+    inspection = inspect_sap2000_target(
         Settings(
             sap2000_install_dir=str(install_dir),
             sap2000_exe_path=str(install_dir / "SAP2000.exe"),
@@ -47,8 +47,8 @@ def test_inspect_sap2000_target_fails_closed_for_missing_files(tmp_path) -> None
         )
     )
 
-    assert target.configured_version == "SAP2000 27"
-    assert target.install_dir_present is True
-    assert target.all_required_present is False
-    assert target.exe_present is False
-    assert isinstance(target.sap2000_helper_progid_registered, bool)
+    assert inspection.target.configured_version == "SAP2000 27"
+    assert inspection.validation.all_required_present is False
+    assert inspection.validation.sap2000_exe_present is False
+    assert isinstance(inspection.validation.helper_progids["SAP2000v1.Helper"], bool)
+    assert inspection.validation.warnings

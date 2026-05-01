@@ -6,11 +6,16 @@ class BridgeModel(BaseModel):
 
 
 class UnitsInfo(BridgeModel):
+    # VERIFY AGAINST INSTALLED SAP2000 API CHM AND SAP2000v1.tlb before mapping
+    # SAP2000 eUnits values into these stable strings.
     present: str
     database: str
     length: str
     force: str
     moment: str
+    temperature: str | None = None
+    mass: str | None = None
+    time: str | None = None
 
 
 class ApiError(BridgeModel):

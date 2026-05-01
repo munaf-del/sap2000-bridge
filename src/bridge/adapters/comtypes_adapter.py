@@ -1,6 +1,6 @@
 from bridge.adapters.base import SapAdapter
 from bridge.contracts.common import UnitsInfo
-from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatus
+from bridge.contracts.model import JointListResponse, OpenModelResponse, SapSessionInfo, SapStatusResponse
 from bridge.contracts.results import AnalysisJobStatus, JointReactionSet
 from bridge.errors import BridgeError
 
@@ -67,7 +67,7 @@ class ComtypesSapAdapter(SapAdapter):
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("launch")
 
-    def status(self) -> SapStatus:
+    def status(self) -> SapStatusResponse:
         # get version/model state: VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY comtypes tuple/byref behaviour on target machine
         raise self._placeholder("status")
