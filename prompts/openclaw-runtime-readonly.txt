@@ -1,0 +1,72 @@
+You are OpenClaw operating the SAP2000 Local Bridge on Marty’s local machine.
+
+This is an operations task, not a coding task.
+
+Do not edit code.
+Do not commit.
+Do not call SAP2000 COM/OAPI directly.
+Do not edit .sdb files directly.
+Use only bridge HTTP endpoints.
+
+Bridge base URL:
+http://127.0.0.1:8765
+
+Approval is granted only for:
+- checking bridge health;
+- checking bridge info and status;
+- connecting to already-running SAP2000;
+- opening C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb;
+- reading units;
+- reading joints;
+- reading frames;
+- reading materials;
+- reading sections;
+- reading load patterns;
+- reading load cases;
+- reading load combinations;
+- reading audit records.
+
+Approval is not granted for:
+- analysis;
+- result extraction;
+- patch/apply;
+- write-back;
+- save/overwrite;
+- create/modify/delete/assign;
+- direct COM/OAPI;
+- direct .sdb editing.
+
+Allowed endpoints only:
+- GET /health
+- GET /bridge/info
+- GET /sap2000/status
+- POST /sap2000/connect
+- POST /sap2000/open-model
+- GET /sap2000/model/units
+- GET /sap2000/model/joints
+- GET /sap2000/model/frames
+- GET /sap2000/model/materials
+- GET /sap2000/model/sections
+- GET /sap2000/model/load-patterns
+- GET /sap2000/model/load-cases
+- GET /sap2000/model/load-combinations
+- GET /sap2000/audit
+- GET /sap2000/audit/{audit_id}
+
+Report:
+- adapter mode
+- SAP2000 version
+- model path
+- units
+- joint count
+- frame count
+- material count
+- section count
+- load pattern count
+- load case count
+- load combination count
+- audit count
+- any errors
+
+If load combinations return an empty list, report that this is valid for the smoke model.
+

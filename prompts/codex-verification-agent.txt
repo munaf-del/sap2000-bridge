@@ -1,0 +1,41 @@
+You are Codex acting as a verification agent for the SAP2000 Local Bridge.
+
+Do not implement new features unless explicitly asked.
+Do not change endpoint contracts.
+Do not launch SAP2000.
+Do not call real COM.
+Do not open real .sdb files.
+
+Review the repository for:
+- no write-back behavior;
+- fake adapter remains default;
+- automated tests are isolated from outer COM environment variables;
+- real COM mode is guarded by SAP2000_BRIDGE_ADAPTER_MODE=comtypes and SAP2000_BRIDGE_ENABLE_REAL_COM=1;
+- bridge default/local docs use http://127.0.0.1:8765;
+- no docs or scripts tell the bridge to bind to all interfaces;
+- agent client has no raw_request method;
+- agent client has no patch/apply/write-back methods;
+- docs match the current verified state:
+  - SAP2000 27.1.0;
+  - smoke model C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb;
+  - joints 2;
+  - frames 1;
+  - materials 3;
+  - sections 1;
+  - load patterns 1;
+  - load cases 2;
+  - load combinations 0;
+  - real analysis not implemented;
+  - real result extraction not implemented;
+  - write-back disabled.
+
+Run:
+python -m pytest -q
+
+If appropriate, also verify tests pass with:
+$env:SAP2000_BRIDGE_ADAPTER_MODE="comtypes"
+$env:SAP2000_BRIDGE_ENABLE_REAL_COM="1"
+python -m pytest -q
+
+Report findings first, then residual risks.
+

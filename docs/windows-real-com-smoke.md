@@ -39,6 +39,14 @@ Joints may return an empty list for blank or newly created models. Load combinat
 
 Analysis and result endpoints exist for fake/contract testing. Real COM analysis is not implemented yet. Real COM result extraction is not implemented yet.
 
+The local agent read-only smoke script is available at:
+
+```powershell
+scripts\agent_readonly_smoke.ps1
+```
+
+It checks health, bridge info/status, connect/open-model, units, joints, frames, materials, sections, load patterns, load cases, load combinations, and audit records. It does not call analysis, result extraction, patch/apply, write-back, save, or model mutation endpoints.
+
 Still not implemented:
 
 - Real analysis.
@@ -186,6 +194,12 @@ python examples\manual_real_metadata_diagnostics.py
 ```
 
 These scripts do not save, modify, write back, or run analysis. If SAP2000 returns names but a detail tuple is uncertain, the bridge returns the object name and `null` for uncertain detail fields.
+
+For a full local agent read-only smoke after the bridge is already running:
+
+```powershell
+scripts\agent_readonly_smoke.ps1
+```
 
 ## Troubleshooting COM Registration
 

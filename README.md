@@ -44,6 +44,25 @@ Runtime agents must use only the approved local bridge endpoints. They must not 
 
 See `docs/agent-policy.md` for the Coding Agent, Verification Agent, and Runtime Bridge Agent rules. See `docs/checkpoint-workflow.md` for the fast checkpoint workflow used by Marty as the sole developer.
 
+## Agent Operations
+
+Codex is the local coding and verification agent. OpenClaw is the runtime bridge agent. Both must use the bridge safely and stay inside the approved role for the current task.
+
+Local agent operations docs and scripts:
+
+- `docs/local-agent-operations.md`: local Codex/OpenClaw operating model, allowed runtime operations, forbidden operations, and stop rules.
+- `docs/openclaw-runtime-bridge-agent.md`: exact OpenClaw runtime instructions and report format.
+- `docs/codex-agent-playbook.md`: Codex coding/verification workflow and checkpoint process.
+- `prompts/openclaw-runtime-readonly.txt`: copy-paste OpenClaw runtime prompt.
+- `prompts/codex-verification-agent.txt`: copy-paste Codex verification prompt.
+- `scripts/start_bridge_fake.ps1`: start fake mode on `127.0.0.1:8765`.
+- `scripts/start_bridge_comtypes.ps1`: start guarded real COM mode on `127.0.0.1:8765`.
+- `scripts/stop_bridge.ps1`: stop only the process listening on `127.0.0.1:8765`.
+- `scripts/agent_readonly_smoke.ps1`: run the approved read-only metadata/audit smoke sequence.
+- `examples/agent_readonly_smoke.py`: Python read-only smoke using the restricted agent client.
+
+The bridge remains local-only. Do not bind it to `0.0.0.0`. Runtime agents must not call analysis, result extraction, patch/apply, write-back, save, overwrite, create, modify, delete, assign, direct COM/OAPI, or direct `.sdb` editing unless a later approved phase explicitly changes scope.
+
 ## Endpoints
 
 - `GET /health`
@@ -159,6 +178,8 @@ Still not implemented in real COM mode:
 - any create, modify, assign, delete, save, or write-back operation.
 
 Manual instructions are in `docs/windows-real-com-smoke.md`. Automated tests intentionally do not launch SAP2000, open a real model, or call real COM.
+
+For local Codex/OpenClaw runtime checks, use `scripts/agent_readonly_smoke.ps1` or `examples/agent_readonly_smoke.py` after the bridge is already running. These smoke scripts read only health, bridge info/status, connect/open-model, units, model metadata, and audit records. They do not call analysis, result extraction, patch/apply, or write-back.
 
 ## Audit And Safety
 
