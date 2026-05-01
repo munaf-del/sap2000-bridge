@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from pydantic import Field
 
 from bridge.contracts.common import BridgeModel, UnitsInfo
@@ -6,15 +7,17 @@ from bridge.contracts.common import BridgeModel, UnitsInfo
 
 class AnalysisJobStatus(BridgeModel):
     job_id: str
-    state: str
+    state: Literal["queued", "running", "succeeded", "failed", "cancelled"]
     model_path: str
     model_name: str
     version_label: str
     version_number: str
     adapter_mode: str
     submitted_at_utc: datetime
-    started_at_utc: datetime
-    finished_at_utc: datetime
+    started_at_utc: datetime | None = None
+    finished_at_utc: datetime | None = None
+    case_status: dict[str, str] = Field(default_factory=dict)
+    error_message: str | None = None
     correlation_id: str = ""
 
 

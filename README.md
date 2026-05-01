@@ -44,6 +44,8 @@ No model write-back is implemented. No route creates, modifies, assigns, deletes
 - `GET /sap2000/model/load-combinations`
 - `POST /sap2000/analyze`
 - `POST /sap2000/analyse`
+- `GET /sap2000/analyze/status/{job_id}`
+- `GET /sap2000/analyse/status/{job_id}`
 - `GET /sap2000/results/joint-reactions`
 
 AI agents must call only these approved bridge endpoints in the MVP.
@@ -71,6 +73,17 @@ Errors use one standard envelope:
 ```
 
 `GET /bridge/info` includes both `sap2000_target` path metadata and `install_validation` readiness flags for SAP2000 27. The validator is safe on machines without SAP2000 installed: missing files and COM registration are reported as false with warnings instead of crashing imports.
+
+## Analysis Jobs
+
+`POST /sap2000/analyze` and `POST /sap2000/analyse` are spelling aliases. They create a serial analysis job and return its lifecycle state. The current fake adapter completes jobs immediately through `queued`, `running`, then `succeeded` or `failed`; only one active job may run at a time.
+
+Job status can be read from either alias:
+
+- `GET /sap2000/analyze/status/{job_id}`
+- `GET /sap2000/analyse/status/{job_id}`
+
+Real SAP2000 analysis is not implemented yet. The future COM adapter still contains placeholders only and must verify `Analyze.RunAnalysis` and any case-status calls against the installed SAP2000 27 API documentation and type library before use.
 
 ## Setup
 

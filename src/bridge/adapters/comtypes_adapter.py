@@ -189,6 +189,7 @@ class ComtypesSapAdapter(SapAdapter):
         save_before_run: bool = False,
         case_names: list[str] | None = None,
     ) -> AnalysisJobStatus:
+        # Likely call family: Analyze.RunAnalysis and, if available, Analyze.GetCaseStatus.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine

@@ -207,7 +207,7 @@ class FakeSapAdapter(SapAdapter):
         now = datetime.now(timezone.utc)
         return AnalysisJobStatus(
             job_id=f"fake-analysis-{uuid4()}",
-            state="completed",
+            state="succeeded",
             model_path=self._model_path or "",
             model_name=self._model_name or "",
             version_label=self._version_label,
@@ -216,6 +216,7 @@ class FakeSapAdapter(SapAdapter):
             submitted_at_utc=now,
             started_at_utc=now,
             finished_at_utc=now,
+            case_status={case_name: "succeeded" for case_name in (case_names or ["ALL"])},
         )
 
     def extract_joint_reactions(

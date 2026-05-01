@@ -23,6 +23,8 @@ SUPPORTED_ENDPOINTS = [
     "GET /sap2000/model/load-combinations",
     "POST /sap2000/analyze",
     "POST /sap2000/analyse",
+    "GET /sap2000/analyze/status/{job_id}",
+    "GET /sap2000/analyse/status/{job_id}",
     "GET /sap2000/results/joint-reactions",
 ]
 
