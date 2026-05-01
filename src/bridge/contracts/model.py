@@ -135,9 +135,9 @@ class ModelMetadataResponse(BridgeModel):
 
 class Frame(BridgeModel):
     name: str
-    start_joint: str
-    end_joint: str
-    section: str
+    start_joint: str | None = None
+    end_joint: str | None = None
+    section: str | None = None
     coord_system: str
 
 
@@ -147,7 +147,7 @@ class FrameListResponse(ModelMetadataResponse):
 
 class Material(BridgeModel):
     name: str
-    material_type: str
+    material_type: str | int | None = None
 
 
 class MaterialListResponse(ModelMetadataResponse):
@@ -156,8 +156,8 @@ class MaterialListResponse(ModelMetadataResponse):
 
 class FrameSection(BridgeModel):
     name: str
-    shape_type: str
-    material: str
+    shape_type: str | None = None
+    material: str | None = None
 
 
 class SectionListResponse(ModelMetadataResponse):
@@ -166,8 +166,8 @@ class SectionListResponse(ModelMetadataResponse):
 
 class LoadPattern(BridgeModel):
     name: str
-    load_type: str
-    self_weight_multiplier: float
+    load_type: str | int | None = None
+    self_weight_multiplier: float | None = None
 
 
 class LoadPatternListResponse(ModelMetadataResponse):
@@ -176,7 +176,7 @@ class LoadPatternListResponse(ModelMetadataResponse):
 
 class LoadCase(BridgeModel):
     name: str
-    case_type: str
+    case_type: str | int | None = None
 
 
 class LoadCaseListResponse(ModelMetadataResponse):
@@ -185,7 +185,7 @@ class LoadCaseListResponse(ModelMetadataResponse):
 
 class LoadCombinationItem(BridgeModel):
     name: str
-    scale_factor: float
+    scale_factor: float | None = None
 
 
 class LoadCombination(BridgeModel):

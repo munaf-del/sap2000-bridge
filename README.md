@@ -127,12 +127,12 @@ Implemented for manual SAP2000 27 smoke verification:
 - open an existing local `.sdb` model, optionally after copying it to `SAP2000_WORKSPACE`;
 - read present/database units with raw enum values;
 - list joints through the point-object smoke path.
+- read frame, material, section, load pattern, load case, and load combination metadata for manual verification.
 
-Manual smoke testing has confirmed connect, open-model, and units for SAP2000 27 on port `8765`. Blank or newly created models may return `joints: []`; that is a valid read-only response. The first non-empty joint verification should use a simple model with at least two points or one frame.
+Manual smoke testing has confirmed connect, open-model, units, and joints for SAP2000 27.1.0 on port `8765`. The non-empty joint smoke model `C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb` returned two joints at 0 m and 5 m along the global X axis. Blank or newly created models may return `joints: []`; that is a valid read-only response. Frame, material, section, load pattern, load case, and load combination metadata are implemented for manual verification.
 
 Still not implemented in real COM mode:
 
-- frame/material/section/load metadata extraction;
 - real analysis;
 - real result extraction;
 - any create, modify, assign, delete, save, or write-back operation.
@@ -165,7 +165,7 @@ Tests and normal imports do not require SAP2000 or `comtypes`.
 ## Test
 
 ```powershell
-pytest -q
+python -m pytest -q
 ```
 
 ## Run The API
@@ -245,6 +245,7 @@ Before expanding real calls, verify:
 - get present units;
 - get database units;
 - list joints;
+- list frames, materials, sections, load patterns, load cases, and load combinations;
 - run analysis;
 - extract joint reactions, frame forces, and modal periods;
 - `comtypes` tuple/byref behavior;

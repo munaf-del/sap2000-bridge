@@ -14,12 +14,12 @@ Implemented for manual verification:
 - Read SAP2000 version.
 - Read present/database units with raw enum values.
 - List joints through the point-object smoke path.
+- Read frame, material, section, load pattern, load case, and load combination metadata for manual verification.
 
-Connect, open-model, and units have been smoke-tested against SAP2000 27 on port `8765`. Joints may return an empty list for blank or newly created models. For the first non-empty joint verification, use a simple model with at least two points or one frame.
+Connect, open-model, units, and joints have been smoke-tested against SAP2000 27.1.0 on port `8765`. The non-empty joint smoke model `C:\SAP2000BridgeWorkspace\smoke_frame_2point.sdb` returned two joints at `(0.0, 0.0, 0.0)` and `(5.0, 0.0, 0.0)`. Joints may return an empty list for blank or newly created models. For the first non-empty metadata verification, use a simple model with at least two points or one frame.
 
 Still not implemented:
 
-- Frame/material/section/load metadata through real COM.
 - Real analysis.
 - Real result extraction.
 - Any model creation, assignment, deletion, modification, save, or write-back.
@@ -144,6 +144,27 @@ For raw point diagnostics without launching, opening, saving, modifying, or runn
 ```powershell
 python examples\manual_real_point_diagnostics.py
 ```
+
+## Read Basic Metadata
+
+After opening a model:
+
+```powershell
+python examples\manual_real_frames.py
+python examples\manual_real_materials.py
+python examples\manual_real_sections.py
+python examples\manual_real_load_patterns.py
+python examples\manual_real_load_cases.py
+python examples\manual_real_load_combinations.py
+```
+
+For raw metadata diagnostics:
+
+```powershell
+python examples\manual_real_metadata_diagnostics.py
+```
+
+These scripts do not save, modify, write back, or run analysis. If SAP2000 returns names but a detail tuple is uncertain, the bridge returns the object name and `null` for uncertain detail fields.
 
 ## Troubleshooting COM Registration
 

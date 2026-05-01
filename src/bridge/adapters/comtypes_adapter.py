@@ -11,13 +11,20 @@ from bridge.adapters.base import SapAdapter
 from bridge.config import Settings, get_settings
 from bridge.contracts.common import UnitsInfo
 from bridge.contracts.model import (
+    Frame,
     FrameListResponse,
+    FrameSection,
     JointInfo,
     JointListResponse,
     JointRestraint,
+    LoadCase,
     LoadCaseListResponse,
+    LoadCombination,
+    LoadCombinationItem,
     LoadCombinationListResponse,
+    LoadPattern,
     LoadPatternListResponse,
+    Material,
     MaterialListResponse,
     OpenModelResponse,
     SapSessionInfo,
@@ -338,42 +345,112 @@ class ComtypesSapAdapter(SapAdapter):
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        raise self._placeholder("list_frames")
+        self._require_model()
+        names = self._metadata_names(
+            operation="FrameObj.GetNameList",
+            sap_context="FrameObj.GetNameList",
+            call_with_byref=lambda: self._sap_model.FrameObj.GetNameList(0, []),
+            call_without_byref=lambda: self._sap_model.FrameObj.GetNameList(),
+        )
+        frames: list[Frame] = []
+        for name in names:
+            start_joint, end_joint = self._try_frame_points(name)
+            section = self._try_frame_section(name)
+            frames.append(
+                Frame(
+                    name=name,
+                    start_joint=start_joint,
+                    end_joint=end_joint,
+                    section=section,
+                    coord_system=csys,
+                )
+            )
+        return FrameListResponse(**self._metadata_envelope(), frames=frames)
 
     def list_materials(self) -> MaterialListResponse:
         # Likely call family: PropMaterial.GetNameList / GetMaterial.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        raise self._placeholder("list_materials")
+        self._require_model()
+        names = self._metadata_names(
+            operation="PropMaterial.GetNameList",
+            sap_context="PropMaterial.GetNameList",
+            call_with_byref=lambda: self._sap_model.PropMaterial.GetNameList(0, []),
+            call_without_byref=lambda: self._sap_model.PropMaterial.GetNameList(),
+        )
+        materials = [Material(name=name, material_type=self._try_material_type(name)) for name in names]
+        return MaterialListResponse(**self._metadata_envelope(), materials=materials)
 
     def list_sections(self) -> SectionListResponse:
         # Likely call family: PropFrame.GetNameList.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        raise self._placeholder("list_sections")
+        self._require_model()
+        names = self._metadata_names(
+            operation="PropFrame.GetNameList",
+            sap_context="PropFrame.GetNameList",
+            call_with_byref=lambda: self._sap_model.PropFrame.GetNameList(0, []),
+            call_without_byref=lambda: self._sap_model.PropFrame.GetNameList(),
+        )
+        sections = [FrameSection(name=name) for name in names]
+        return SectionListResponse(**self._metadata_envelope(), sections=sections)
 
     def list_load_patterns(self) -> LoadPatternListResponse:
         # Likely call family: LoadPatterns.GetNameList / GetLoadType.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        raise self._placeholder("list_load_patterns")
+        self._require_model()
+        names = self._metadata_names(
+            operation="LoadPatterns.GetNameList",
+            sap_context="LoadPatterns.GetNameList",
+            call_with_byref=lambda: self._sap_model.LoadPatterns.GetNameList(0, []),
+            call_without_byref=lambda: self._sap_model.LoadPatterns.GetNameList(),
+        )
+        patterns = [
+            LoadPattern(
+                name=name,
+                load_type=self._try_load_pattern_type(name),
+                self_weight_multiplier=None,
+            )
+            for name in names
+        ]
+        return LoadPatternListResponse(**self._metadata_envelope(), load_patterns=patterns)
 
     def list_load_cases(self) -> LoadCaseListResponse:
         # Likely call family: LoadCases.GetNameList / GetTypeOAPI.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        raise self._placeholder("list_load_cases")
+        self._require_model()
+        names = self._metadata_names(
+            operation="LoadCases.GetNameList",
+            sap_context="LoadCases.GetNameList",
+            call_with_byref=lambda: self._sap_model.LoadCases.GetNameList(0, []),
+            call_without_byref=lambda: self._sap_model.LoadCases.GetNameList(),
+        )
+        cases = [LoadCase(name=name, case_type=self._try_load_case_type(name)) for name in names]
+        return LoadCaseListResponse(**self._metadata_envelope(), load_cases=cases)
 
     def list_load_combinations(self) -> LoadCombinationListResponse:
         # Likely call family: RespCombo.GetNameList / GetCaseList / GetTypeCombo.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
         # VERIFY AGAINST SAP2000v1.tlb
         # VERIFY comtypes tuple/byref behaviour on target machine
-        raise self._placeholder("list_load_combinations")
+        self._require_model()
+        names = self._metadata_names(
+            operation="RespCombo.GetNameList",
+            sap_context="RespCombo.GetNameList",
+            call_with_byref=lambda: self._sap_model.RespCombo.GetNameList(0, []),
+            call_without_byref=lambda: self._sap_model.RespCombo.GetNameList(),
+        )
+        combinations = [
+            LoadCombination(name=name, items=self._try_load_combination_items(name))
+            for name in names
+        ]
+        return LoadCombinationListResponse(**self._metadata_envelope(), load_combinations=combinations)
 
     def run_analysis(
         self,
@@ -562,6 +639,115 @@ class ComtypesSapAdapter(SapAdapter):
             retryable=False,
         )
 
+    def _metadata_envelope(self) -> dict[str, object]:
+        units = self.get_units()
+        return {
+            "model_path": self._model_path or "",
+            "model_name": self._model_name or "",
+            "version_label": self._version_label or "",
+            "version_number": self._version_number or "",
+            "adapter_mode": self.adapter_mode,
+            "units": units,
+        }
+
+    def _metadata_names(self, operation: str, sap_context: str, call_with_byref, call_without_byref) -> list[str]:
+        try:
+            result = self._call(call_with_byref, operation=operation, sap_context=sap_context)
+        except BridgeError:
+            result = self._call(call_without_byref, operation=operation, sap_context=sap_context)
+        try:
+            return self._parse_name_list_result(result, operation=operation)
+        except BridgeError as exc:
+            if exc.bridge_code == "SAP2000_COM_SIGNATURE_UNVERIFIED":
+                raise self._metadata_parse_error(operation=sap_context) from exc
+            raise
+
+    def _try_frame_points(self, frame_name: str) -> tuple[str | None, str | None]:
+        try:
+            result = self._call(
+                lambda: self._sap_model.FrameObj.GetPoints(frame_name, "", ""),
+                operation="FrameObj.GetPoints",
+                sap_context=f"FrameObj.GetPoints({frame_name})",
+            )
+            values = self._payload_without_ret(result, "FrameObj.GetPoints")
+            point_names = [str(value) for value in values if isinstance(value, str) and value]
+            if len(point_names) >= 2:
+                return point_names[0], point_names[1]
+        except BridgeError:
+            logger.debug("FrameObj.GetPoints detail unavailable for %s.", frame_name, exc_info=True)
+        return None, None
+
+    def _try_frame_section(self, frame_name: str) -> str | None:
+        try:
+            result = self._call(
+                lambda: self._sap_model.FrameObj.GetSection(frame_name, "", ""),
+                operation="FrameObj.GetSection",
+                sap_context=f"FrameObj.GetSection({frame_name})",
+            )
+            values = self._payload_without_ret(result, "FrameObj.GetSection")
+            strings = [str(value) for value in values if isinstance(value, str) and value]
+            return strings[0] if strings else None
+        except BridgeError:
+            logger.debug("FrameObj.GetSection detail unavailable for %s.", frame_name, exc_info=True)
+            return None
+
+    def _try_material_type(self, material_name: str) -> str | int | None:
+        try:
+            result = self._call(
+                lambda: self._sap_model.PropMaterial.GetMaterial(material_name),
+                operation="PropMaterial.GetMaterial",
+                sap_context=f"PropMaterial.GetMaterial({material_name})",
+            )
+            values = self._payload_without_ret(result, "PropMaterial.GetMaterial")
+            for value in values:
+                if isinstance(value, (str, int)) and not isinstance(value, bool):
+                    return value
+        except BridgeError:
+            logger.debug("PropMaterial.GetMaterial detail unavailable for %s.", material_name, exc_info=True)
+        return None
+
+    def _try_load_pattern_type(self, pattern_name: str) -> str | int | None:
+        try:
+            result = self._call(
+                lambda: self._sap_model.LoadPatterns.GetLoadType(pattern_name),
+                operation="LoadPatterns.GetLoadType",
+                sap_context=f"LoadPatterns.GetLoadType({pattern_name})",
+            )
+            values = self._payload_without_ret(result, "LoadPatterns.GetLoadType")
+            for value in values:
+                if isinstance(value, (str, int)) and not isinstance(value, bool):
+                    return value
+        except BridgeError:
+            logger.debug("LoadPatterns.GetLoadType detail unavailable for %s.", pattern_name, exc_info=True)
+        return None
+
+    def _try_load_case_type(self, case_name: str) -> str | int | None:
+        try:
+            result = self._call(
+                lambda: self._sap_model.LoadCases.GetTypeOAPI(case_name),
+                operation="LoadCases.GetTypeOAPI",
+                sap_context=f"LoadCases.GetTypeOAPI({case_name})",
+            )
+            values = self._payload_without_ret(result, "LoadCases.GetTypeOAPI")
+            for value in values:
+                if isinstance(value, (str, int)) and not isinstance(value, bool):
+                    return value
+        except BridgeError:
+            logger.debug("LoadCases.GetTypeOAPI detail unavailable for %s.", case_name, exc_info=True)
+        return None
+
+    def _try_load_combination_items(self, combo_name: str) -> list[LoadCombinationItem]:
+        try:
+            result = self._call(
+                lambda: self._sap_model.RespCombo.GetCaseList(combo_name, 0, [], [], []),
+                operation="RespCombo.GetCaseList",
+                sap_context=f"RespCombo.GetCaseList({combo_name})",
+            )
+            return self._parse_combo_case_list(result)
+        except BridgeError:
+            logger.debug("RespCombo.GetCaseList detail unavailable for %s.", combo_name, exc_info=True)
+            return []
+
     def _try_get_all_points(self, csys: str) -> list[tuple[str, float, float, float]] | None:
         # Preferred PointObj.GetAllPoints. SAP2000 27 may not expose this on all installations.
         # VERIFY AGAINST INSTALLED SAP2000 API CHM
@@ -641,7 +827,7 @@ class ComtypesSapAdapter(SapAdapter):
             operation="PointObj.GetRestraint",
             sap_context=f"cPointObj.GetRestraint({name})",
         )
-        values = self._values_from_result(result, "PointObj.GetRestraint", f"cPointObj.GetRestraint({name})")
+        values = self._payload_without_ret(result, f"PointObj.GetRestraint({name})")
         flags = self._first_bool_sequence(values)
         if flags is None or len(flags) < 6:
             raise self._signature_error("PointObj.GetRestraint")
@@ -741,7 +927,10 @@ class ComtypesSapAdapter(SapAdapter):
         return version_label, version_number
 
     def _parse_get_name_list_result(self, result: Any) -> list[str]:
-        values = self._payload_without_ret(result, "PointObj.GetNameList")
+        return self._parse_name_list_result(result, operation="PointObj.GetNameList")
+
+    def _parse_name_list_result(self, result: Any, operation: str) -> list[str]:
+        values = self._payload_without_ret(result, operation)
         count = self._first_int(values)
         names: list[str] = []
         for value in values:
@@ -753,7 +942,7 @@ class ComtypesSapAdapter(SapAdapter):
             return []
         if names:
             return names[:count] if count is not None and count >= 0 else names
-        raise self._signature_error("PointObj.GetNameList")
+        raise self._signature_error(operation)
 
     def _parse_get_coord_cartesian_result(self, result: Any, point_name: str) -> tuple[float, float, float]:
         values = self._payload_without_ret(result, f"PointObj.GetCoordCartesian({point_name})")
@@ -785,6 +974,30 @@ class ComtypesSapAdapter(SapAdapter):
             (names[index], x_values[index], y_values[index], z_values[index])
             for index in range(row_count)
         ]
+
+    def _parse_combo_case_list(self, result: Any) -> list[LoadCombinationItem]:
+        values = self._payload_without_ret(result, "RespCombo.GetCaseList")
+        count = self._first_int(values)
+        sequences = [list(value) for value in values if self._is_sequence(value)]
+        if not sequences:
+            return []
+
+        names: list[str] = []
+        factors: list[float] = []
+        for sequence in sequences:
+            if not names:
+                names = self._coerce_name_list(sequence)
+                if names:
+                    continue
+            if not factors:
+                factors = self._coerce_float_list(sequence)
+
+        row_count = count if count is not None and count >= 0 else len(names)
+        items: list[LoadCombinationItem] = []
+        for index, name in enumerate(names[:row_count]):
+            factor = factors[index] if index < len(factors) else None
+            items.append(LoadCombinationItem(name=name, scale_factor=factor))
+        return items
 
     @staticmethod
     def _coerce_name_list(value) -> list[str]:
@@ -895,6 +1108,16 @@ class ComtypesSapAdapter(SapAdapter):
             http_status=501,
             bridge_code="SAP2000_COM_SIGNATURE_UNVERIFIED",
             message=f"Could not interpret SAP2000 COM return values for {operation}. {VERIFY_ALL}.",
+            retryable=False,
+        )
+
+    @staticmethod
+    def _metadata_parse_error(operation: str) -> BridgeError:
+        return BridgeError(
+            http_status=502,
+            bridge_code="SAP2000_COM_ERROR",
+            message=f"SAP2000 COM metadata response could not be parsed during {operation}.",
+            sap_context=operation,
             retryable=False,
         )
 

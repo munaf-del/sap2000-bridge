@@ -15,9 +15,25 @@ from bridge.services.session_manager import SessionManager, session_manager
 
 
 class MockSapModel:
-    def __init__(self, version_result=None, point_obj=None) -> None:
+    def __init__(
+        self,
+        version_result=None,
+        point_obj=None,
+        frame_obj=None,
+        prop_material=None,
+        prop_frame=None,
+        load_patterns=None,
+        load_cases=None,
+        resp_combo=None,
+    ) -> None:
         self.version_result = version_result if version_result is not None else ("SAP2000 v27", "27.0.0", 0)
         self.PointObj = point_obj or MockPointObj()
+        self.FrameObj = frame_obj or MockFrameObj()
+        self.PropMaterial = prop_material or MockPropMaterial()
+        self.PropFrame = prop_frame or MockPropFrame()
+        self.LoadPatterns = load_patterns or MockLoadPatterns()
+        self.LoadCases = load_cases or MockLoadCases()
+        self.RespCombo = resp_combo or MockRespCombo()
 
     def GetVersion(self):
         return self.version_result
@@ -50,6 +66,91 @@ class MockPointObj:
         if name not in self.coord_results:
             raise RuntimeError(f"unknown point {name}")
         return self.coord_results[name]
+
+
+class MockFrameObj:
+    def __init__(self, name_list_result=None, points=None, sections=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+        self.points = points or {}
+        self.sections = sections or {}
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+    def GetPoints(self, name, *args):
+        if name not in self.points:
+            raise RuntimeError("frame points unavailable")
+        start, end = self.points[name]
+        return [start, end, 0]
+
+    def GetSection(self, name, *args):
+        if name not in self.sections:
+            raise RuntimeError("frame section unavailable")
+        return [self.sections[name], "", 0]
+
+
+class MockPropMaterial:
+    def __init__(self, name_list_result=None, material_types=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+        self.material_types = material_types or {}
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+    def GetMaterial(self, name, *args):
+        if name not in self.material_types:
+            raise RuntimeError("material type unavailable")
+        return [self.material_types[name], 0]
+
+
+class MockPropFrame:
+    def __init__(self, name_list_result=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+
+class MockLoadPatterns:
+    def __init__(self, name_list_result=None, load_types=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+        self.load_types = load_types or {}
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+    def GetLoadType(self, name, *args):
+        if name not in self.load_types:
+            raise RuntimeError("load pattern type unavailable")
+        return [self.load_types[name], 0]
+
+
+class MockLoadCases:
+    def __init__(self, name_list_result=None, case_types=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+        self.case_types = case_types or {}
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+    def GetTypeOAPI(self, name, *args):
+        if name not in self.case_types:
+            raise RuntimeError("load case type unavailable")
+        return [self.case_types[name], 0]
+
+
+class MockRespCombo:
+    def __init__(self, name_list_result=None, case_lists=None) -> None:
+        self.name_list_result = name_list_result if name_list_result is not None else [0, (), 0]
+        self.case_lists = case_lists or {}
+
+    def GetNameList(self, *args):
+        return self.name_list_result
+
+    def GetCaseList(self, name, *args):
+        if name not in self.case_lists:
+            raise RuntimeError("combo case list unavailable")
+        return self.case_lists[name]
 
 
 class MockSapObject:
@@ -209,7 +310,7 @@ def test_comtypes_placeholder_mentions_required_verification(monkeypatch) -> Non
     adapter = comtypes_adapter.ComtypesSapAdapter(settings=Settings(enable_real_com=True))
 
     with pytest.raises(BridgeError) as exc_info:
-        adapter.list_frames()
+        adapter.run_analysis()
 
     message = getattr(exc_info.value, "message")
     assert "VERIFY AGAINST INSTALLED SAP2000 API CHM" in message
@@ -567,6 +668,117 @@ def test_copy_to_same_workspace_file_does_not_copy(monkeypatch, tmp_path) -> Non
     assert copy_calls == []
 
 
+def test_comtypes_metadata_name_parser_supports_ret_code_last(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    assert adapter._parse_name_list_result([2, ("A", "B"), 0], "FrameObj.GetNameList") == ["A", "B"]
+
+
+def test_comtypes_metadata_name_parser_supports_ret_code_first(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    assert adapter._parse_name_list_result([0, 2, ("A", "B")], "FrameObj.GetNameList") == ["A", "B"]
+
+
+def test_comtypes_empty_metadata_lists_return_empty_responses(monkeypatch) -> None:
+    adapter, _ = configured_comtypes_adapter(monkeypatch)
+
+    assert adapter.list_frames().frames == []
+    assert adapter.list_materials().materials == []
+    assert adapter.list_sections().sections == []
+    assert adapter.list_load_patterns().load_patterns == []
+    assert adapter.list_load_cases().load_cases == []
+    assert adapter.list_load_combinations().load_combinations == []
+
+
+def test_comtypes_frame_metadata_parses_names_points_and_sections(monkeypatch) -> None:
+    frame_obj = MockFrameObj(
+        name_list_result=[1, ("F1",), 0],
+        points={"F1": ("1", "2")},
+        sections={"F1": "Default"},
+    )
+    adapter, _ = configured_comtypes_adapter(monkeypatch, MockSapModel(frame_obj=frame_obj))
+
+    response = adapter.list_frames()
+
+    assert len(response.frames) == 1
+    assert response.frames[0].name == "F1"
+    assert response.frames[0].start_joint == "1"
+    assert response.frames[0].end_joint == "2"
+    assert response.frames[0].section == "Default"
+    assert response.model_path == "C:/models/demo.sdb"
+    assert response.adapter_mode == "comtypes"
+    assert response.units.present == "kN_m_C"
+
+
+def test_comtypes_material_section_load_metadata_shapes(monkeypatch) -> None:
+    sap_model = MockSapModel(
+        prop_material=MockPropMaterial(name_list_result=[2, ("CONC", "STEEL"), 0], material_types={"CONC": 2}),
+        prop_frame=MockPropFrame(name_list_result=[1, ("R1",), 0]),
+        load_patterns=MockLoadPatterns(name_list_result=[1, ("DEAD",), 0], load_types={"DEAD": 1}),
+        load_cases=MockLoadCases(name_list_result=[1, ("DEAD",), 0], case_types={"DEAD": 1}),
+        resp_combo=MockRespCombo(name_list_result=[1, ("ULS",), 0], case_lists={"ULS": [2, ("DEAD", "LIVE"), (1.2, 1.5), 0]}),
+    )
+    adapter, _ = configured_comtypes_adapter(monkeypatch, sap_model)
+
+    materials = adapter.list_materials().materials
+    sections = adapter.list_sections().sections
+    load_patterns = adapter.list_load_patterns().load_patterns
+    load_cases = adapter.list_load_cases().load_cases
+    combos = adapter.list_load_combinations().load_combinations
+
+    assert materials[0].name == "CONC"
+    assert materials[0].material_type == 2
+    assert materials[1].name == "STEEL"
+    assert materials[1].material_type is None
+    assert sections == [comtypes_adapter.FrameSection(name="R1")]
+    assert load_patterns[0].name == "DEAD"
+    assert load_patterns[0].load_type == 1
+    assert load_patterns[0].self_weight_multiplier is None
+    assert load_cases[0].name == "DEAD"
+    assert load_cases[0].case_type == 1
+    assert combos[0].name == "ULS"
+    assert [(item.name, item.scale_factor) for item in combos[0].items] == [("DEAD", 1.2), ("LIVE", 1.5)]
+
+
+def test_malformed_comtypes_metadata_tuple_returns_standard_error_envelope(monkeypatch) -> None:
+    sap_model = MockSapModel(frame_obj=MockFrameObj(name_list_result=[1, 0]))
+    sap_object = MockSapObject(sap_model=sap_model)
+    helper = MockHelper(sap_object=sap_object)
+    client = MockComtypesClient(helper=helper)
+    monkeypatch.setattr(comtypes_adapter.sys, "platform", "win32")
+    monkeypatch.setattr(comtypes_adapter, "comtypes_client", client)
+    monkeypatch.setattr(comtypes_adapter, "comtypes_module", MockComtypesModule())
+    monkeypatch.setattr(
+        session_manager_module,
+        "get_settings",
+        lambda: Settings(adapter_mode="comtypes", enable_real_com=True),
+    )
+    session_manager.reset()
+    session_manager.adapter._sap_object = sap_object
+    session_manager.adapter._sap_model = sap_model
+    session_manager.adapter._connected = True
+    session_manager.adapter._model_path = "C:/models/demo.sdb"
+    session_manager.adapter._version_label = "27.1.0"
+    session_manager.adapter._version_number = 27.1
+
+    try:
+        response = TestClient(app).get("/sap2000/model/frames")
+        body = response.json()
+
+        assert response.status_code == 502
+        assert body["error"]["bridge_code"] == "SAP2000_COM_ERROR"
+        assert body["error"]["sap_context"] == "FrameObj.GetNameList"
+        assert body["error"]["correlation_id"]
+    finally:
+        monkeypatch.setattr(
+            session_manager_module,
+            "get_settings",
+            lambda: Settings(adapter_mode="fake", enable_real_com=False),
+        )
+        session_manager.reset()
+
+
 def test_manual_real_com_scripts_import_without_executing_com(monkeypatch) -> None:
     monkeypatch.delenv("SAP2000_BRIDGE_ENABLE_REAL_COM", raising=False)
     scripts = [
@@ -575,8 +787,15 @@ def test_manual_real_com_scripts_import_without_executing_com(monkeypatch) -> No
         "manual_real_open_model.py",
         "manual_real_units.py",
         "manual_real_joints.py",
+        "manual_real_frames.py",
+        "manual_real_materials.py",
+        "manual_real_sections.py",
+        "manual_real_load_patterns.py",
+        "manual_real_load_cases.py",
+        "manual_real_load_combinations.py",
         "manual_real_attach_diagnostics.py",
         "manual_real_point_diagnostics.py",
+        "manual_real_metadata_diagnostics.py",
     ]
 
     for script_name in scripts:
